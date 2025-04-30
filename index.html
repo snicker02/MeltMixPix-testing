@@ -42,11 +42,13 @@
         </div>
 
         <div id="preEffectControls" class="mb-6 border-t pt-6">
-            <label class="block text-sm font-medium text-gray-600 mb-3">2. Apply Pre-Effect (Optional):</label>
+            <label class="block text-sm font-medium text-gray-600 mb-3">2. Apply Pre-Effect(s) Sequentially:</label>
 
-            <div class="control-row mb-4 pb-3 border-b border-gray-200"> <label for="preEffectSelector">Effect:</label>
+            <div class="control-row mb-4 pb-3 border-b border-gray-200">
+                <label for="preEffectSelector">Effect:</label>
                 <select id="preEffectSelector" class="shadow-sm">
-                    <option value="none" selected>None</option> <option value="noise">Noise</option>
+                    <option value="none" selected>None</option>
+                    <option value="noise">Noise</option>
                     <option value="scanLines">Scan Lines</option>
                     <option value="sliceShift">Slice Shift</option>
                     <option value="pixelSort">Pixel Sort</option>
@@ -57,7 +59,14 @@
                     <option value="waveDistortion">Wave Distortion</option>
                     <option value="fractalZoom">Fractal Zoom</option>
                 </select>
-                </div>
+
+                <button id="applyEffectButton" class="bg-purple-500 hover:bg-purple-700 text-white font-semibold py-1 px-3 rounded text-xs disabled:opacity-50" disabled title="Apply selected effect permanently to the source image">
+                    Apply Pre-Effect
+                </button>
+                <button id="undoButton" title="Undo Last Apply" disabled>Undo</button>
+                 <button id="redoButton" title="Redo Last Undo" disabled>Redo</button>
+            </div>
+
 
             <div id="preEffectOptionsContainer" class="effect-options">
                 <div id="preEffectIntensityControl" class="effect-option-group hidden">
