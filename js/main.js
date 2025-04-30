@@ -1,5 +1,4 @@
-title: MeltMixPix-main/js/main.js (Apply Button Workflow)
-content: // js/main.js (Apply Button Workflow)
+// js/main.js (Apply Button Workflow)
 
 // --- Utility Imports ---
 import {
