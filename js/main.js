@@ -1,4 +1,5 @@
-// js/main.js (Apply Button Workflow)
+title: MeltMixPix-main/js/main.js (Apply Button Workflow)
+content: // js/main.js (Apply Button Workflow)
 
 // --- Utility Imports ---
 import {
@@ -176,13 +177,15 @@ function applySourceEffectForPreview() {
         // console.log(`Previewing effect: ${effect}`);
         try {
             const imageDataToPreview = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const effectContext = { sourceImageData: baseImageData }; // Source for preview is the base state
+            const effectContext = { // Provide a copy of the current canvas as source
+                sourceImageData: new ImageData( new Uint8ClampedArray(imageDataToPreview.data), imageDataToPreview.width, imageDataToPreview.height )
+            };
             effectFunction(imageDataToPreview, params, effectContext); // Apply effect IN PLACE
             ctx.putImageData(imageDataToPreview, 0, 0); // Put modified data back for preview
         } catch (e) {
              console.error(`applySourceEffectForPreview: Error applying effect '${effect}':`, e);
              showMessage(`Preview Error: ${e.message || 'Unknown'}.`, true, elements.messageBox);
-             // Return canvas *before* the failed effect
+             // Don't return null, return canvas *before* the failed effect
         }
     }
     // Return the canvas (showing base + currently selected preview effect)
@@ -193,12 +196,29 @@ function applySourceEffectForPreview() {
 // Get Current Effect Parameters (Reads from UI)
 function getCurrentEffectAndParams() {
     const effect = elements.preEffectSelector?.value || 'none';
-    const params = { intensity: parseInt(elements.preEffectIntensitySlider?.value || 30, 10) };
+    const params = { intensity: parseInt(elements.preEffectIntensitySlider?.value || 30, 10) }; // Default intensity 30
     switch (effect) {
-        case 'waveDistortion': /*...*/ params.amplitude = parseInt(elements.preEffectWaveAmplitudeSlider?.value || 10, 10); params.frequency = parseInt(elements.preEffectWaveFrequencySlider?.value || 5, 10); params.phase = parseInt(elements.preEffectWavePhaseSlider?.value || 0, 10) * (Math.PI / 180); params.direction = elements.preEffectWaveDirection?.value || 'horizontal'; params.waveType = elements.preEffectWaveType?.value || 'sine'; break;
-        case 'sliceShift': params.intensity = parseInt(elements.sliceShiftIntensitySlider?.value || 30, 10); params.direction = elements.sliceShiftDirection?.value || 'horizontal'; break;
-        case 'pixelSort': params.threshold = parseInt(elements.pixelSortThresholdSlider?.value || 100, 10); params.direction = elements.pixelSortDirection?.value || 'horizontal'; params.sortBy = elements.pixelSortBy?.value || 'brightness'; break;
-        case 'scanLines': params.intensity = parseInt(elements.scanLinesIntensitySlider?.value || 50, 10); params.direction = elements.scanLinesDirection?.value || 'horizontal'; params.thickness = parseInt(elements.scanLinesThicknessSlider?.value || 2, 10); break;
+        case 'waveDistortion':
+            params.amplitude = parseInt(elements.preEffectWaveAmplitudeSlider?.value || 10, 10);
+            params.frequency = parseInt(elements.preEffectWaveFrequencySlider?.value || 5, 10);
+            params.phase = parseInt(elements.preEffectWavePhaseSlider?.value || 0, 10) * (Math.PI / 180);
+            params.direction = elements.preEffectWaveDirection?.value || 'horizontal';
+            params.waveType = elements.preEffectWaveType?.value || 'sine';
+            break;
+        case 'sliceShift':
+            params.intensity = parseInt(elements.sliceShiftIntensitySlider?.value || 30, 10); // Use specific slider
+            params.direction = elements.sliceShiftDirection?.value || 'horizontal';
+            break;
+        case 'pixelSort':
+            params.threshold = parseInt(elements.pixelSortThresholdSlider?.value || 100, 10);
+            params.direction = elements.pixelSortDirection?.value || 'horizontal';
+            params.sortBy = elements.pixelSortBy?.value || 'brightness';
+            break;
+        case 'scanLines':
+             params.intensity = parseInt(elements.scanLinesIntensitySlider?.value || 50, 10); // Assuming elements existed
+             params.direction = elements.scanLinesDirection?.value || 'horizontal';
+             params.thickness = parseInt(elements.scanLinesThicknessSlider?.value || 2, 10);
+            break;
     }
     return { effect, params };
 }
@@ -207,7 +227,7 @@ function getCurrentEffectAndParams() {
 // --- Event Handlers ---
 
 function handleSliderChange() {
-    // Update value spans
+    // Update tiling value spans
     if(elements.tilesXValueSpan && elements.tilesXSlider) elements.tilesXValueSpan.textContent = elements.tilesXSlider.value;
     if(elements.tilesYValueSpan && elements.tilesYSlider) elements.tilesYValueSpan.textContent = elements.tilesYSlider.value;
     if(elements.skewValueSpan && elements.skewSlider) elements.skewValueSpan.textContent = parseFloat(elements.skewSlider.value).toFixed(1);
@@ -215,7 +235,7 @@ function handleSliderChange() {
     if(elements.scaleValueSpan && elements.scaleSlider) elements.scaleValueSpan.textContent = parseFloat(elements.scaleSlider.value).toFixed(2);
     if(elements.preTileXValueSpan && elements.preTileXSlider) elements.preTileXValueSpan.textContent = elements.preTileXSlider.value;
     if(elements.preTileYValueSpan && elements.preTileYSlider) elements.preTileYValueSpan.textContent = elements.preTileYSlider.value;
-    // Effect slider spans updated by setupSliderListener
+    // Effect slider spans are updated via setupSliderListener
 
     requestProcessAndPreview(); // Request processing preview when ANY slider changes
 }
@@ -232,13 +252,15 @@ function handleOptionChange(event) {
 
 // Handles loading a new image file - UPDATED for history
 function handleImageLoad(event) {
-    console.log("handleImageLoad: Triggered.");
+    console.log("handleImageLoad: Triggered."); // Basic log
+    // Define reset function locally, including clearHistory callback
     const resetFunc = () => resetState(elements, state,
         () => updateTilingControlsVisibility(elements, handleSliderChange),
         () => updatePreEffectControlsVisibility(elements),
         handleSliderChange,
         () => clearHistory(state, updateUndoRedoButtonsWrapper, elements) // Pass history clear
     );
+
     const file = event.target.files?.[0];
     if (!file || !file.type.startsWith('image/')) { resetFunc(); showMessage(file ? 'Invalid file type.' : 'No file selected.', true, elements.messageBox); return; }
     state.originalFileName = file.name;
@@ -252,7 +274,7 @@ function handleImageLoad(event) {
             state.originalAspectRatio = state.originalWidth / state.originalHeight;
             if (!state.originalWidth || !state.originalHeight) { resetFunc(); showMessage('Error: Image loaded with invalid dimensions.', true, elements.messageBox); return; }
 
-            // Create initial ImageData
+            // Create initial ImageData using a temporary canvas
             const tempCanvas = document.createElement('canvas');
             const tempCtx = tempCanvas.getContext('2d');
             tempCanvas.width = state.originalWidth; tempCanvas.height = state.originalHeight;
@@ -262,7 +284,10 @@ function handleImageLoad(event) {
                  state.originalImageData = tempCtx.getImageData(0, 0, state.originalWidth, state.originalHeight);
                  // Initial "applied" state is same as original
                  state.lastAppliedImageData = new ImageData( new Uint8ClampedArray(state.originalImageData.data), state.originalImageData.width, state.originalImageData.height );
-            } catch (error) { resetFunc(); showMessage('Could not process initial image data.', true, elements.messageBox); return; }
+            } catch (error) {
+                 console.error("handleImageLoad: Error getting initial ImageData:", error);
+                 resetFunc(); showMessage('Could not process initial image data.', true, elements.messageBox); return;
+            }
 
             // --- Setup UI and History ---
             if(elements.outputWidthInput) elements.outputWidthInput.value = state.originalWidth;
@@ -296,7 +321,7 @@ function handleImageLoad(event) {
                 updateTilingControlsVisibility(elements, handleSliderChange);
                 updatePreEffectControlsVisibility(elements);
                 handleSliderChange(); // Update slider displays
-                requestProcessAndPreview(); // Trigger initial preview
+                requestProcessAndPreview(); // Trigger initial preview (should show original + tiling)
                 showMessage('Image loaded. Adjust effect/tiling.', false, elements.messageBox);
             });
         };
@@ -319,9 +344,9 @@ function handleApplyEffect() {
     const { effect, params } = getCurrentEffectAndParams();
     if (effect === 'none') {
          showMessage("Select an effect to apply first.", false, elements.messageBox);
-         return;
+         return; // Don't do anything if 'none' is selected
     }
-    console.log(`Applying effect permanently: ${effect}`);
+    console.log(`Applying effect permanently: ${effect}`); // Keep this log
     state.isProcessing = true; // Prevent concurrent processing
 
     // Create a truly independent copy to modify
@@ -335,9 +360,12 @@ function handleApplyEffect() {
     if (effectFunction) {
          try {
             const effectContext = { sourceImageData: baseImageData }; // Source is the last committed state
-            effectFunction(imageDataToCommit, params, effectContext);
+            effectFunction(imageDataToCommit, params, effectContext); // Apply to the copy
             effectAppliedSuccessfully = true;
-         } catch (e) { /* ... error handling ... */ }
+         } catch (e) {
+             console.error(`handleApplyEffect: Error applying effect '${effect}':`, e);
+             showMessage(`Error applying effect: ${e.message || 'Unknown error'}.`, true, elements.messageBox);
+         }
     }
     state.isProcessing = false; // Allow processing again
 
@@ -352,18 +380,22 @@ function handleApplyEffect() {
 
 // --- Event Handlers for Undo/Redo ---
 function handleUndo() {
-    // Pass state.ctx for putImageData, and callback to update lastAppliedImageData
+    // Pass state.ctx if needed by putImageData, and callback to update lastAppliedImageData
     undo(state, updateUndoRedoButtonsWrapper, elements, (imageData) => {
-        state.lastAppliedImageData = imageData; // Update state on successful undo
-        requestProcessAndPreview(); // Refresh preview
+        // The undo function in historyUtils now handles updating lastAppliedImageData and ctx.putImageData
+        if (imageData) { // Optional: Check if undo was successful
+             requestProcessAndPreview(); // Refresh preview based on new lastAppliedImageData
+        }
     });
 }
 
 function handleRedo() {
-    // Pass state.ctx for putImageData, and callback to update lastAppliedImageData
+    // Pass state.ctx if needed, and callback to update lastAppliedImageData
     redo(state, updateUndoRedoButtonsWrapper, elements, (imageData) => {
-         state.lastAppliedImageData = imageData; // Update state on successful redo
-         requestProcessAndPreview(); // Refresh preview
+         // The redo function in historyUtils now handles updating lastAppliedImageData and ctx.putImageData
+         if (imageData) { // Optional: Check if redo was successful
+            requestProcessAndPreview(); // Refresh preview based on new lastAppliedImageData
+         }
     });
 }
 
@@ -373,89 +405,55 @@ function updateUndoRedoButtonsWrapper() {
 }
 
 
-// Replace the existing saveImage function in js/main.js
-
+// Handles saving the final image
 function saveImage() {
-    // Check prerequisites: current preview canvas must exist and have content
-    if (!elements.canvas || elements.canvas.width === 0 || state.isProcessing) {
-        showMessage('Cannot save now. Ensure an image is processed and visible.', true, elements.messageBox);
-        return;
-    }
-    // Check output dimension inputs exist
-    if (!elements.outputWidthInput || !elements.outputHeightInput) {
-        showMessage('Output dimension input elements missing.', true, elements.messageBox);
-        return;
-    }
+    const baseImageDataForSave = state.lastAppliedImageData || state.originalImageData;
+    if (!baseImageDataForSave || state.isProcessing) { /* ... */ return; }
+    if (!elements.canvas || !elements.outputWidthInput || !elements.outputHeightInput || !elements.sourceEffectCanvas || !state.sourceEffectCtx ) { /* ... */ return; }
 
+    // Run tiling on the last COMMITTED data
+    const saveSourceCanvas = elements.sourceEffectCanvas;
+    const saveSourceCtx = state.sourceEffectCtx;
+    // Ensure canvas size matches committed data
+    if (saveSourceCanvas.width !== baseImageDataForSave.width || saveSourceCanvas.height !== baseImageDataForSave.height){
+        saveSourceCanvas.width = baseImageDataForSave.width;
+        saveSourceCanvas.height = baseImageDataForSave.height;
+    }
+    saveSourceCtx.putImageData(baseImageDataForSave, 0, 0);
+    // Run tiling using this canvas as the *final* source before tiling/mirroring
+    processAndPreviewImage(saveSourceCanvas, elements, state, (msg, isErr)=>console.log(msg)); // Run tiling silently
+
+    // Now save the final tiled result from elements.canvas
     try {
-        // 1. Read target dimensions from input fields
         const targetWidth = parseInt(elements.outputWidthInput.value, 10);
         const targetHeight = parseInt(elements.outputHeightInput.value, 10);
-
-        // Validate dimensions
-        if (isNaN(targetWidth) || isNaN(targetHeight) || targetWidth <= 0 || targetHeight <= 0) {
-            showMessage('Invalid output dimensions specified.', true, elements.messageBox);
-            return;
-        }
-
-        // --- ADD LOGS for Dimensions ---
-        console.log(`SaveImage - Target Dimensions: <span class="math-inline">\{targetWidth\}x</span>{targetHeight}`);
-        console.log(`SaveImage - Source Canvas (elements.canvas) Dimensions: <span class="math-inline">\{elements\.canvas\.width\}x</span>{elements.canvas.height}`);
-        // --- END LOGS ---
-
-
-        // 2. Create a temporary output canvas with target dimensions
-        const outputCanvas = document.createElement('canvas');
-        outputCanvas.width = targetWidth;
-        outputCanvas.height = targetHeight;
-        const outputCtx = outputCanvas.getContext('2d');
-        if (!outputCtx) {
-            throw new Error("Could not create output canvas context.");
-        }
-
-        // 3. Draw the *current preview* canvas onto the output canvas, resizing it
-        outputCtx.imageSmoothingQuality = "high"; // Use high quality for resizing
-        outputCtx.drawImage(
-            elements.canvas, // Source is the main preview canvas
-            0, 0, elements.canvas.width, elements.canvas.height, // Source rect (full preview canvas)
-            0, 0, targetWidth, targetHeight // Destination rect (full output canvas, resizing happens here)
-        );
-
-        // 4. Generate Data URL and Download Link
+        if (isNaN(targetWidth) || isNaN(targetHeight) || targetWidth <= 0 || targetHeight <= 0) { /* ... */ return; }
+        const outputCanvas = document.createElement('canvas'); /* ... */
+        const outputCtx = outputCanvas.getContext('2d'); /* ... */
+        outputCtx.drawImage(elements.canvas, 0, 0, elements.canvas.width, elements.canvas.height, 0, 0, targetWidth, targetHeight);
         const dataURL = outputCanvas.toDataURL('image/png');
-        const link = document.createElement('a');
-        link.href = dataURL;
+        const link = document.createElement('a'); link.href = dataURL;
 
-        // --- Generate descriptive filename (keep existing logic) ---
+        // Generate filename
         const selectedShape = document.querySelector('input[name="tileShape"]:checked')?.value || 'grid';
         const mirrorType = document.querySelector('input[name="mirrorOption"]:checked')?.value || 'none';
-        const preEffect = elements.preEffectSelector?.value || 'none';
-        const effectApplied = state.historyIndex > 0; // Check if any effects were committed via Apply button
-        const shapeMap = { grid:'grid',brick_wall:'brick',herringbone:'herring',hexagon:'hex',skewed:'skw',semi_octagon_square:'octsq',l_shape_square:'lsq',hexagon_triangle:'hextri',square_triangle:'sqtri',rhombus:'rho',basketweave:'bask'};
-        const shapeStr = shapeMap[selectedShape] || 'unk';
+        const effectApplied = state.historyIndex > 0; // Check if any effects were committed
+        const shapeMap = { /* ... */ }; const shapeStr = shapeMap[selectedShape] || 'unk';
         const mirrorStr = mirrorType !== 'none' ? `_m${mirrorType.substring(0,1)}` : '';
-        // Include the *currently selected* effect in the filename, as that's what the preview shows
-        const preEffectStr = preEffect !== 'none' ? `_fx-${preEffect}` : '';
+        const preEffectStr = effectApplied ? `_fx-applied` : ''; // Indicate effects were applied
         const tileStr = `_t${elements.tilesXSlider?.value}x${elements.tilesYSlider?.value}`;
         const preTileStr = `_p${elements.preTileXSlider?.value}x${elements.preTileYSlider?.value}`;
         const scaleStr = `_sc${elements.scaleSlider?.value}`;
-        let shapeParams = ''; if (selectedShape === 'skewed') { shapeParams = `_sk${elements.skewSlider?.value}_st${elements.staggerSlider?.value}`; }
+        let shapeParams = ''; if (selectedShape === 'skewed') { /* ... */ }
         const baseName = state.originalFileName.substring(0, state.originalFileName.lastIndexOf('.')) || state.originalFileName;
         const extension = state.originalFileName.substring(state.originalFileName.lastIndexOf('.')) || '.png';
-        link.download = `<span class="math-inline">\{baseName\}</span>{preEffectStr}_${shapeStr}<span class="math-inline">\{mirrorStr\}</span>{tileStr}<span class="math-inline">\{preTileStr\}</span>{shapeParams}<span class="math-inline">\{scaleStr\}\_</span>{targetWidth}x${targetHeight}${extension}`
-            .replace(/_none/g,'').replace(/_fx-none/g,'')
+        link.download = `${baseName}${preEffectStr}_${shapeStr}${mirrorStr}${tileStr}${preTileStr}${shapeParams}${scaleStr}_${targetWidth}x${targetHeight}${extension}`
+            .replace(/_none/g,'').replace(/_fx-applied_fx-none/g,'_fx-applied') // Clean up
             .replace(/__/g,'_').replace(/^_|_$/g, '');
 
-        // 5. Trigger Download
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
         showMessage('Image saved successfully!', false, elements.messageBox);
-
-     } catch (error) {
-        console.error('Error saving image:', error);
-        showMessage(`Could not save the image: ${error.message}`, true, elements.messageBox);
-     }
+     } catch (error) { console.error('Error saving image:', error); showMessage(`Could not save the image: ${error.message}`, true, elements.messageBox); }
 }
 
 // --- Event Listeners Setup ---
@@ -471,7 +469,7 @@ function setupEventListeners() {
     // Tiling controls
     elements.tileShapeOptions?.forEach(opt => opt.addEventListener('change', handleOptionChange));
     elements.mirrorOptions?.forEach(opt => opt.addEventListener('change', handleOptionChange));
-    const tilingSliders = [ /* ... */ ];
+    const tilingSliders = [ elements.tilesXSlider, /* ... */ elements.preTileYSlider ];
     tilingSliders.forEach(slider => { if(slider) slider.addEventListener('input', handleSliderChange); });
 
     // Pre-Effect controls trigger preview
@@ -492,9 +490,9 @@ function setupEventListeners() {
     elements.sourceZoomSlider?.addEventListener('input', () => handleSourceZoom( elements, state, () => updateSourcePreviewTransform(elements, state), handleSliderChange ));
     elements.outputWidthInput?.addEventListener('input', (e) => handleDimensionChange(e, elements, state));
     elements.outputHeightInput?.addEventListener('input', (e) => handleDimensionChange(e, elements, state));
-    elements.keepAspectRatioCheckbox?.addEventListener('change', () => { /* ... */ });
+    elements.keepAspectRatioCheckbox?.addEventListener('change', () => { if (elements.keepAspectRatioCheckbox?.checked && state.currentImage) { handleDimensionChange({ target: elements.outputWidthInput }, elements, state); } });
     elements.sourcePreviewContainer?.addEventListener('mousedown', (e) => startPan(e, elements, state));
-    document.addEventListener('mousemove', (e) => { if (!state || !state.currentImage) { return; } panMove( e, elements, state, () => updateSourcePreviewTransform(elements, state), handleSliderChange ); });
+    document.addEventListener('mousemove', (e) => { if (!state || !state.currentImage || !state.isDragging) { return; } panMove( e, elements, state, () => updateSourcePreviewTransform(elements, state), handleSliderChange ); }); // Only pan if dragging
     document.addEventListener('mouseup', () => endPan(elements, state));
     elements.sourcePreviewContainer?.addEventListener('mouseleave', () => endPan(elements, state));
 
@@ -511,6 +509,7 @@ function initializeApp() {
          handleSliderChange,
          () => clearHistory(state, updateUndoRedoButtonsWrapper, elements) // Pass clearHistory
      );
+     // Ensure contexts are valid
      if (!state.sourceEffectCtx && elements.sourceEffectCanvas) { state.sourceEffectCtx = elements.sourceEffectCanvas.getContext('2d', { willReadFrequently: true }); }
      if (!state.ctx && elements.canvas) { state.ctx = elements.canvas.getContext('2d', { willReadFrequently: true }); }
      if (!state.sourceEffectCtx || !state.ctx) { console.error("initializeApp: Failed to get required canvas contexts!"); }
