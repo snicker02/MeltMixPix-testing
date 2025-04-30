@@ -373,50 +373,89 @@ function updateUndoRedoButtonsWrapper() {
 }
 
 
-// Handles saving the final image
+// Replace the existing saveImage function in js/main.js
+
 function saveImage() {
-    const baseImageDataForSave = state.lastAppliedImageData || state.originalImageData;
-    if (!baseImageDataForSave || state.isProcessing) { /* ... */ return; }
-    if (!elements.canvas || !elements.outputWidthInput || !elements.outputHeightInput || !elements.sourceEffectCanvas || !state.sourceEffectCtx ) { /* ... */ return; }
+    // Check prerequisites: current preview canvas must exist and have content
+    if (!elements.canvas || elements.canvas.width === 0 || state.isProcessing) {
+        showMessage('Cannot save now. Ensure an image is processed and visible.', true, elements.messageBox);
+        return;
+    }
+    // Check output dimension inputs exist
+    if (!elements.outputWidthInput || !elements.outputHeightInput) {
+        showMessage('Output dimension input elements missing.', true, elements.messageBox);
+        return;
+    }
 
-    // Run tiling on the last COMMITTED data
-    const saveSourceCanvas = elements.sourceEffectCanvas;
-    const saveSourceCtx = state.sourceEffectCtx;
-    saveSourceCanvas.width = baseImageDataForSave.width; saveSourceCanvas.height = baseImageDataForSave.height;
-    saveSourceCtx.putImageData(baseImageDataForSave, 0, 0);
-    processAndPreviewImage(saveSourceCanvas, elements, state, (msg, isErr)=>console.log(msg)); // Run tiling
-
-    // Now save the final tiled result from elements.canvas
     try {
+        // 1. Read target dimensions from input fields
         const targetWidth = parseInt(elements.outputWidthInput.value, 10);
         const targetHeight = parseInt(elements.outputHeightInput.value, 10);
-        if (isNaN(targetWidth) || isNaN(targetHeight) || targetWidth <= 0 || targetHeight <= 0) { /* ... */ return; }
-        const outputCanvas = document.createElement('canvas'); /* ... */
-        const outputCtx = outputCanvas.getContext('2d'); /* ... */
-        outputCtx.drawImage(elements.canvas, 0, 0, elements.canvas.width, elements.canvas.height, 0, 0, targetWidth, targetHeight);
-        const dataURL = outputCanvas.toDataURL('image/png');
-        const link = document.createElement('a'); link.href = dataURL;
 
-        // Generate filename
+        // Validate dimensions
+        if (isNaN(targetWidth) || isNaN(targetHeight) || targetWidth <= 0 || targetHeight <= 0) {
+            showMessage('Invalid output dimensions specified.', true, elements.messageBox);
+            return;
+        }
+
+        // --- ADD LOGS for Dimensions ---
+        console.log(`SaveImage - Target Dimensions: <span class="math-inline">\{targetWidth\}x</span>{targetHeight}`);
+        console.log(`SaveImage - Source Canvas (elements.canvas) Dimensions: <span class="math-inline">\{elements\.canvas\.width\}x</span>{elements.canvas.height}`);
+        // --- END LOGS ---
+
+
+        // 2. Create a temporary output canvas with target dimensions
+        const outputCanvas = document.createElement('canvas');
+        outputCanvas.width = targetWidth;
+        outputCanvas.height = targetHeight;
+        const outputCtx = outputCanvas.getContext('2d');
+        if (!outputCtx) {
+            throw new Error("Could not create output canvas context.");
+        }
+
+        // 3. Draw the *current preview* canvas onto the output canvas, resizing it
+        outputCtx.imageSmoothingQuality = "high"; // Use high quality for resizing
+        outputCtx.drawImage(
+            elements.canvas, // Source is the main preview canvas
+            0, 0, elements.canvas.width, elements.canvas.height, // Source rect (full preview canvas)
+            0, 0, targetWidth, targetHeight // Destination rect (full output canvas, resizing happens here)
+        );
+
+        // 4. Generate Data URL and Download Link
+        const dataURL = outputCanvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.href = dataURL;
+
+        // --- Generate descriptive filename (keep existing logic) ---
         const selectedShape = document.querySelector('input[name="tileShape"]:checked')?.value || 'grid';
         const mirrorType = document.querySelector('input[name="mirrorOption"]:checked')?.value || 'none';
-        const effectApplied = state.historyIndex > 0; // Check if any effects were committed
-        const shapeMap = { /* ... */ }; const shapeStr = shapeMap[selectedShape] || 'unk';
+        const preEffect = elements.preEffectSelector?.value || 'none';
+        const effectApplied = state.historyIndex > 0; // Check if any effects were committed via Apply button
+        const shapeMap = { grid:'grid',brick_wall:'brick',herringbone:'herring',hexagon:'hex',skewed:'skw',semi_octagon_square:'octsq',l_shape_square:'lsq',hexagon_triangle:'hextri',square_triangle:'sqtri',rhombus:'rho',basketweave:'bask'};
+        const shapeStr = shapeMap[selectedShape] || 'unk';
         const mirrorStr = mirrorType !== 'none' ? `_m${mirrorType.substring(0,1)}` : '';
-        const preEffectStr = effectApplied ? `_fx-applied` : '';
+        // Include the *currently selected* effect in the filename, as that's what the preview shows
+        const preEffectStr = preEffect !== 'none' ? `_fx-${preEffect}` : '';
         const tileStr = `_t${elements.tilesXSlider?.value}x${elements.tilesYSlider?.value}`;
         const preTileStr = `_p${elements.preTileXSlider?.value}x${elements.preTileYSlider?.value}`;
         const scaleStr = `_sc${elements.scaleSlider?.value}`;
-        let shapeParams = ''; if (selectedShape === 'skewed') { /* ... */ }
+        let shapeParams = ''; if (selectedShape === 'skewed') { shapeParams = `_sk${elements.skewSlider?.value}_st${elements.staggerSlider?.value}`; }
         const baseName = state.originalFileName.substring(0, state.originalFileName.lastIndexOf('.')) || state.originalFileName;
         const extension = state.originalFileName.substring(state.originalFileName.lastIndexOf('.')) || '.png';
-        link.download = `${baseName}${preEffectStr}_${shapeStr}${mirrorStr}${tileStr}${preTileStr}${shapeParams}${scaleStr}_${targetWidth}x${targetHeight}${extension}`
-            .replace(/_none/g,'').replace(/_fx-applied_fx-none/g,'_fx-applied')
+        link.download = `<span class="math-inline">\{baseName\}</span>{preEffectStr}_${shapeStr}<span class="math-inline">\{mirrorStr\}</span>{tileStr}<span class="math-inline">\{preTileStr\}</span>{shapeParams}<span class="math-inline">\{scaleStr\}\_</span>{targetWidth}x${targetHeight}${extension}`
+            .replace(/_none/g,'').replace(/_fx-none/g,'')
             .replace(/__/g,'_').replace(/^_|_$/g, '');
 
-        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        // 5. Trigger Download
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
         showMessage('Image saved successfully!', false, elements.messageBox);
-     } catch (error) { console.error('Error saving image:', error); showMessage(`Could not save the image: ${error.message}`, true, elements.messageBox); }
+
+     } catch (error) {
+        console.error('Error saving image:', error);
+        showMessage(`Could not save the image: ${error.message}`, true, elements.messageBox);
+     }
 }
 
 // --- Event Listeners Setup ---
