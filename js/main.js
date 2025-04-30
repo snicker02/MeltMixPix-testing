@@ -5,23 +5,23 @@ import {
     showMessage, updateTilingControlsVisibility, updatePreEffectControlsVisibility,
     updateSourcePreviewTransform, handleDimensionChange, resetState,
     startPan, panMove, endPan, handleSourceZoom, setupSliderListener
- } from './utils/uiUtils.js';
-import { processAndPreviewImage } from './tiling/core.js';
+ } from './utils/uiUtils.js'; //
+import { processAndPreviewImage } from './tiling/core.js'; //
 // --- NEW: History Imports ---
-import { updateUndoRedoButtons, clearHistory, pushHistoryState, undo, redo } from './utils/historyUtils.js';
+import { updateUndoRedoButtons, clearHistory, pushHistoryState, undo, redo } from './utils/historyUtils.js'; //
 
 
 // --- Effect Imports ---
-import { applyNoise } from './effects/noise.js';
-import { applyScanLines } from './effects/scanLines.js';
-import { applyWaveDistortion } from './effects/waveDistortion.js';
-import { applyFractalZoom } from './effects/fractalZoom.js';
-import { applySliceShift } from './effects/sliceShift.js';
-import { applyPixelSort } from './effects/pixelSort.js';
-import { applyChannelShift } from './effects/channelShift.js';
-import { applyBlockDisplace } from './effects/blockDisplace.js';
-import { applyInvertBlocks } from './effects/invertBlocks.js';
-import { applySierpinski } from './effects/sierpinski.js';
+import { applyNoise } from './effects/noise.js'; //
+import { applyScanLines } from './effects/scanLines.js'; //
+import { applyWaveDistortion } from './effects/waveDistortion.js'; //
+import { applyFractalZoom } from './effects/fractalZoom.js'; //
+import { applySliceShift } from './effects/sliceShift.js'; //
+import { applyPixelSort } from './effects/pixelSort.js'; //
+import { applyChannelShift } from './effects/channelShift.js'; //
+import { applyBlockDisplace } from './effects/blockDisplace.js'; //
+import { applyInvertBlocks } from './effects/invertBlocks.js'; //
+import { applySierpinski } from './effects/sierpinski.js'; //
 
 
 // --- DOM Element References ---
@@ -82,7 +82,7 @@ const elements = {
     // Group sliders/selects for enabling/disabling
     sliders: [ document.getElementById('tilesX'), document.getElementById('tilesY'), document.getElementById('skewFactor'), document.getElementById('staggerOffset'), document.getElementById('tileScale'), document.getElementById('preTileX'), document.getElementById('preTileY'), document.getElementById('sourceZoom'), document.getElementById('preEffectIntensitySlider'), document.getElementById('preEffectWaveAmplitudeSlider'), document.getElementById('preEffectWaveFrequencySlider'), document.getElementById('preEffectWavePhaseSlider'), document.getElementById('sliceShiftIntensitySlider'), document.getElementById('pixelSortThresholdSlider') ],
      selects: [ document.getElementById('preEffectSelector'), document.getElementById('preEffectWaveDirection'), document.getElementById('preEffectWaveType'), document.getElementById('sliceShiftDirection'), document.getElementById('pixelSortDirection'), document.getElementById('pixelSortBy') ]
-};
+}; //
 
 // --- State Variables ---
 const state = {
@@ -102,22 +102,22 @@ const state = {
     historyIndex: -1,
     // Add final output context to state if needed by history utils (check historyUtils)
     ctx: elements.canvas?.getContext('2d', { willReadFrequently: true }) // Context of the final tiling canvas
-};
+}; //
 
  // --- Effect Function Map ---
  const effectFunctions = {
-    'noise': applyNoise,
-    'scanLines': applyScanLines,
-    'waveDistortion': applyWaveDistortion,
-    'fractalZoom': applyFractalZoom,
-    'sliceShift': applySliceShift,
-    'pixelSort': applyPixelSort,
-    'channelShift': applyChannelShift,
-    'blockDisplace': applyBlockDisplace,
-    'invertBlocks': applyInvertBlocks,
-    'sierpinski': applySierpinski,
+    'noise': applyNoise, //
+    'scanLines': applyScanLines, //
+    'waveDistortion': applyWaveDistortion, //
+    'fractalZoom': applyFractalZoom, //
+    'sliceShift': applySliceShift, //
+    'pixelSort': applyPixelSort, //
+    'channelShift': applyChannelShift, //
+    'blockDisplace': applyBlockDisplace, //
+    'invertBlocks': applyInvertBlocks, //
+    'sierpinski': applySierpinski, //
     'none': null
-};
+}; //
 
 // --- Debounced Processing Function ---
 // Generates the preview based on the *last committed state* plus the *currently selected effect*
@@ -135,14 +135,14 @@ function requestProcessAndPreview() {
                  processAndPreviewImage(
                      sourceCanvasForPreview, elements, state,
                      (msg, isErr) => showMessage(msg, isErr, elements.messageBox)
-                 );
+                 ); //
             } else {
                  console.error("requestProcessAndPreview: Failed to get source canvas for previewing.");
-                 showMessage("Error preparing preview image.", true, elements.messageBox);
+                 showMessage("Error preparing preview image.", true, elements.messageBox); //
             }
         }
     }, 150); // Debounce delay
-}
+} //
 
 // --- Apply *Single* Pre-Effect FOR PREVIEW---
 // Reads the LATEST COMMITTED state (lastAppliedImageData)
@@ -183,13 +183,13 @@ function applySourceEffectForPreview() {
             ctx.putImageData(imageDataToPreview, 0, 0); // Put modified data back for preview
         } catch (e) {
              console.error(`applySourceEffectForPreview: Error applying effect '${effect}':`, e);
-             showMessage(`Preview Error: ${e.message || 'Unknown'}.`, true, elements.messageBox);
-             // Don't return null, return canvas *before* the failed effect
+             showMessage(`Preview Error: ${e.message || 'Unknown'}.`, true, elements.messageBox); //
+             // Return canvas *before* the failed effect
         }
     }
     // Return the canvas (showing base + currently selected preview effect)
     return canvas;
-}
+} //
 
 
 // Get Current Effect Parameters (Reads from UI)
@@ -220,13 +220,13 @@ function getCurrentEffectAndParams() {
             break;
     }
     return { effect, params };
-}
+} //
 
 
 // --- Event Handlers ---
 
 function handleSliderChange() {
-    // Update tiling value spans
+    // Update value spans
     if(elements.tilesXValueSpan && elements.tilesXSlider) elements.tilesXValueSpan.textContent = elements.tilesXSlider.value;
     if(elements.tilesYValueSpan && elements.tilesYSlider) elements.tilesYValueSpan.textContent = elements.tilesYSlider.value;
     if(elements.skewValueSpan && elements.skewSlider) elements.skewValueSpan.textContent = parseFloat(elements.skewSlider.value).toFixed(1);
@@ -234,34 +234,35 @@ function handleSliderChange() {
     if(elements.scaleValueSpan && elements.scaleSlider) elements.scaleValueSpan.textContent = parseFloat(elements.scaleSlider.value).toFixed(2);
     if(elements.preTileXValueSpan && elements.preTileXSlider) elements.preTileXValueSpan.textContent = elements.preTileXSlider.value;
     if(elements.preTileYValueSpan && elements.preTileYSlider) elements.preTileYValueSpan.textContent = elements.preTileYSlider.value;
-    // Effect slider spans are updated via setupSliderListener
+    // Effect slider spans updated by setupSliderListener
 
     requestProcessAndPreview(); // Request processing preview when ANY slider changes
-}
+} //
 
 function handleOptionChange(event) {
     const target = event.target;
     if (!target) return;
     // Update relevant UI section visibility
-    if (target.name === 'tileShape') { updateTilingControlsVisibility(elements, null); }
-    else if (target.id === 'preEffectSelector') { updatePreEffectControlsVisibility(elements); }
+    if (target.name === 'tileShape') { updateTilingControlsVisibility(elements, null); } //
+    else if (target.id === 'preEffectSelector') { updatePreEffectControlsVisibility(elements); } //
     // Always request preview update on option change
     requestProcessAndPreview();
-}
+} //
 
 // Handles loading a new image file - UPDATED for history
 function handleImageLoad(event) {
     console.log("handleImageLoad: Triggered."); // Basic log
+
     // Define reset function locally, including clearHistory callback
     const resetFunc = () => resetState(elements, state,
-        () => updateTilingControlsVisibility(elements, handleSliderChange),
-        () => updatePreEffectControlsVisibility(elements),
+        () => updateTilingControlsVisibility(elements, handleSliderChange), //
+        () => updatePreEffectControlsVisibility(elements), //
         handleSliderChange,
         () => clearHistory(state, updateUndoRedoButtonsWrapper, elements) // Pass history clear
-    );
+    ); //
 
     const file = event.target.files?.[0];
-    if (!file || !file.type.startsWith('image/')) { resetFunc(); showMessage(file ? 'Invalid file type.' : 'No file selected.', true, elements.messageBox); return; }
+    if (!file || !file.type.startsWith('image/')) { resetFunc(); showMessage(file ? 'Invalid file type.' : 'No file selected.', true, elements.messageBox); return; } //
     state.originalFileName = file.name;
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -271,13 +272,13 @@ function handleImageLoad(event) {
             state.originalWidth = img.naturalWidth;
             state.originalHeight = img.naturalHeight;
             state.originalAspectRatio = state.originalWidth / state.originalHeight;
-            if (!state.originalWidth || !state.originalHeight) { resetFunc(); showMessage('Error: Image loaded with invalid dimensions.', true, elements.messageBox); return; }
+            if (!state.originalWidth || !state.originalHeight) { resetFunc(); showMessage('Error: Image loaded with invalid dimensions.', true, elements.messageBox); return; } //
 
-            // Create initial ImageData using a temporary canvas
+            // Create initial ImageData
             const tempCanvas = document.createElement('canvas');
             const tempCtx = tempCanvas.getContext('2d');
             tempCanvas.width = state.originalWidth; tempCanvas.height = state.originalHeight;
-            if (!tempCtx) { resetFunc(); showMessage('Failed to create temp context.', true, elements.messageBox); return; }
+            if (!tempCtx) { resetFunc(); showMessage('Failed to create temp context.', true, elements.messageBox); return; } //
             try {
                  tempCtx.drawImage(img, 0, 0, state.originalWidth, state.originalHeight);
                  state.originalImageData = tempCtx.getImageData(0, 0, state.originalWidth, state.originalHeight);
@@ -285,7 +286,7 @@ function handleImageLoad(event) {
                  state.lastAppliedImageData = new ImageData( new Uint8ClampedArray(state.originalImageData.data), state.originalImageData.width, state.originalImageData.height );
             } catch (error) {
                  console.error("handleImageLoad: Error getting initial ImageData:", error);
-                 resetFunc(); showMessage('Could not process initial image data.', true, elements.messageBox); return;
+                 resetFunc(); showMessage('Could not process initial image data.', true, elements.messageBox); return; //
             }
 
             // --- Setup UI and History ---
@@ -300,7 +301,7 @@ function handleImageLoad(event) {
             if(elements.sourceZoomValueSpan) elements.sourceZoomValueSpan.textContent = '1.0';
 
             requestAnimationFrame(() => { // Ensure DOM updates before transform
-                const { clampedX, clampedY } = updateSourcePreviewTransform(elements, state);
+                const { clampedX, clampedY } = updateSourcePreviewTransform(elements, state); //
                 state.currentOffsetX = clampedX; state.currentOffsetY = clampedY;
                 // Enable controls
                 if(elements.saveButton) elements.saveButton.disabled = false;
@@ -314,35 +315,35 @@ function handleImageLoad(event) {
                 if(elements.keepAspectRatioCheckbox) elements.keepAspectRatioCheckbox.disabled = false;
 
                 // Initialize History
-                clearHistory(state, updateUndoRedoButtonsWrapper, elements);
+                clearHistory(state, updateUndoRedoButtonsWrapper, elements); //
                 pushHistoryState(state.originalImageData, state, updateUndoRedoButtonsWrapper, elements); // Push BASE state
 
-                updateTilingControlsVisibility(elements, handleSliderChange);
-                updatePreEffectControlsVisibility(elements);
+                updateTilingControlsVisibility(elements, handleSliderChange); //
+                updatePreEffectControlsVisibility(elements); //
                 handleSliderChange(); // Update slider displays
-                requestProcessAndPreview(); // Trigger initial preview (should show original + tiling)
-                showMessage('Image loaded. Adjust effect/tiling.', false, elements.messageBox);
+                requestProcessAndPreview(); // Trigger initial preview
+                showMessage('Image loaded. Adjust effect/tiling.', false, elements.messageBox); //
             });
         };
-        img.onerror = () => { resetFunc(); showMessage('Error loading image data.', true, elements.messageBox); };
+        img.onerror = () => { resetFunc(); showMessage('Error loading image data.', true, elements.messageBox); }; //
         img.src = e.target.result;
     };
-    reader.onerror = () => { resetFunc(); showMessage('Error reading file.', true, elements.messageBox); };
+    reader.onerror = () => { resetFunc(); showMessage('Error reading file.', true, elements.messageBox); }; //
     reader.readAsDataURL(file);
-    event.target.value = null;
-}
+    event.target.value = null; // Allow re-selecting same file
+} //
 
 // --- Event Handler for Apply Button ---
 function handleApplyEffect() {
     // Use last committed state as base
     const baseImageData = state.lastAppliedImageData;
     if (!baseImageData || state.isProcessing) {
-        showMessage("Cannot apply effect now (no base image or processing).", true, elements.messageBox);
+        showMessage("Cannot apply effect now (no base image or processing).", true, elements.messageBox); //
         return;
     }
     const { effect, params } = getCurrentEffectAndParams();
     if (effect === 'none') {
-         showMessage("Select an effect to apply first.", false, elements.messageBox);
+         showMessage("Select an effect to apply first.", false, elements.messageBox); //
          return; // Don't do anything if 'none' is selected
     }
     console.log(`Applying effect permanently: ${effect}`); // Keep this log
@@ -363,7 +364,7 @@ function handleApplyEffect() {
             effectAppliedSuccessfully = true;
          } catch (e) {
              console.error(`handleApplyEffect: Error applying effect '${effect}':`, e);
-             showMessage(`Error applying effect: ${e.message || 'Unknown error'}.`, true, elements.messageBox);
+             showMessage(`Error applying effect: ${e.message || 'Unknown error'}.`, true, elements.messageBox); //
          }
     }
     state.isProcessing = false; // Allow processing again
@@ -372,64 +373,66 @@ function handleApplyEffect() {
         state.lastAppliedImageData = imageDataToCommit; // Update the base state
         pushHistoryState(state.lastAppliedImageData, state, updateUndoRedoButtonsWrapper, elements); // Push NEW state
         requestProcessAndPreview(); // Update the preview to show the newly committed state
-        showMessage(`Effect '${effect}' applied.`, false, elements.messageBox);
+        showMessage(`Effect '${effect}' applied.`, false, elements.messageBox); //
     }
-}
+} //
 
 
 // --- Event Handlers for Undo/Redo ---
 function handleUndo() {
-    // Pass state.ctx if needed by putImageData, and callback to update lastAppliedImageData
-    undo(state, updateUndoRedoButtonsWrapper, elements, (imageData) => {
-        // The undo function in historyUtils now handles updating lastAppliedImageData and ctx.putImageData
-        if (imageData) { // Optional: Check if undo was successful
-             requestProcessAndPreview(); // Refresh preview based on new lastAppliedImageData
+    // Pass state for context, wrapper for button updates, elements for button refs, callback to update state
+    undo(state, updateUndoRedoButtonsWrapper, elements, (imageData) => { //
+        if (imageData) { // Check if undo returned valid data
+             state.lastAppliedImageData = imageData; // Update state on successful undo
+             requestProcessAndPreview(); // Refresh preview
         }
     });
-}
+} //
 
 function handleRedo() {
-    // Pass state.ctx if needed, and callback to update lastAppliedImageData
-    redo(state, updateUndoRedoButtonsWrapper, elements, (imageData) => {
-         // The redo function in historyUtils now handles updating lastAppliedImageData and ctx.putImageData
-         if (imageData) { // Optional: Check if redo was successful
-            requestProcessAndPreview(); // Refresh preview based on new lastAppliedImageData
+    // Pass state for context, wrapper for button updates, elements for button refs, callback to update state
+    redo(state, updateUndoRedoButtonsWrapper, elements, (imageData) => { //
+         if (imageData) { // Check if redo returned valid data
+            state.lastAppliedImageData = imageData; // Update state on successful redo
+            requestProcessAndPreview(); // Refresh preview
          }
     });
-}
+} //
 
 // Wrapper for history utils button updates
 function updateUndoRedoButtonsWrapper() {
-    updateUndoRedoButtons(elements, state);
-}
+    updateUndoRedoButtons(elements, state); //
+} //
 
 
 // Handles saving the final image
 function saveImage() {
+    // Use state.lastAppliedImageData as the basis for the final tiled image if available
     const baseImageDataForSave = state.lastAppliedImageData || state.originalImageData;
-    if (!baseImageDataForSave || state.isProcessing) { /* ... */ return; }
-    if (!elements.canvas || !elements.outputWidthInput || !elements.outputHeightInput || !elements.sourceEffectCanvas || !state.sourceEffectCtx ) { /* ... */ return; }
+    if (!baseImageDataForSave || state.isProcessing) { showMessage('Image data not ready or processing.', true, elements.messageBox); return; } //
+    if (!elements.canvas || !elements.outputWidthInput || !elements.outputHeightInput || !elements.sourceEffectCanvas || !state.sourceEffectCtx ) { showMessage('Required elements missing for save.', true, elements.messageBox); return; } //
 
-    // Run tiling on the last COMMITTED data
+    // We need to run the *tiling* process one last time on the *committed* data
+    // Put committed data onto the sourceEffectCanvas (as if 'none' effect selected for preview)
     const saveSourceCanvas = elements.sourceEffectCanvas;
     const saveSourceCtx = state.sourceEffectCtx;
-    // Ensure canvas size matches committed data
-    if (saveSourceCanvas.width !== baseImageDataForSave.width || saveSourceCanvas.height !== baseImageDataForSave.height){
-        saveSourceCanvas.width = baseImageDataForSave.width;
-        saveSourceCanvas.height = baseImageDataForSave.height;
-    }
+    saveSourceCanvas.width = baseImageDataForSave.width;
+    saveSourceCanvas.height = baseImageDataForSave.height;
     saveSourceCtx.putImageData(baseImageDataForSave, 0, 0);
+
     // Run tiling using this canvas as the *final* source before tiling/mirroring
     processAndPreviewImage(saveSourceCanvas, elements, state, (msg, isErr)=>console.log(msg)); // Run tiling silently
+
 
     // Now save the final tiled result from elements.canvas
     try {
         const targetWidth = parseInt(elements.outputWidthInput.value, 10);
         const targetHeight = parseInt(elements.outputHeightInput.value, 10);
-        if (isNaN(targetWidth) || isNaN(targetHeight) || targetWidth <= 0 || targetHeight <= 0) { /* ... */ return; }
-        const outputCanvas = document.createElement('canvas'); /* ... */
-        const outputCtx = outputCanvas.getContext('2d'); /* ... */
-        outputCtx.drawImage(elements.canvas, 0, 0, elements.canvas.width, elements.canvas.height, 0, 0, targetWidth, targetHeight);
+        if (isNaN(targetWidth) || isNaN(targetHeight) || targetWidth <= 0 || targetHeight <= 0) { showMessage('Invalid output dimensions specified.', true, elements.messageBox); return; } //
+        const outputCanvas = document.createElement('canvas'); outputCanvas.width = targetWidth; outputCanvas.height = targetHeight;
+        const outputCtx = outputCanvas.getContext('2d'); if (!outputCtx) throw new Error("Could not create output canvas context.");
+        outputCtx.imageSmoothingQuality = "high";
+        outputCtx.drawImage(elements.canvas, 0, 0, elements.canvas.width, elements.canvas.height, 0, 0, targetWidth, targetHeight); // Draw final canvas
         const dataURL = outputCanvas.toDataURL('image/png');
         const link = document.createElement('a'); link.href = dataURL;
 
@@ -437,23 +440,24 @@ function saveImage() {
         const selectedShape = document.querySelector('input[name="tileShape"]:checked')?.value || 'grid';
         const mirrorType = document.querySelector('input[name="mirrorOption"]:checked')?.value || 'none';
         const effectApplied = state.historyIndex > 0; // Check if any effects were committed
-        const shapeMap = { /* ... */ }; const shapeStr = shapeMap[selectedShape] || 'unk';
+        const shapeMap = { grid:'grid',brick_wall:'brick',herringbone:'herring',hexagon:'hex',skewed:'skw',semi_octagon_square:'octsq',l_shape_square:'lsq',hexagon_triangle:'hextri',square_triangle:'sqtri',rhombus:'rho',basketweave:'bask'};
+        const shapeStr = shapeMap[selectedShape] || 'unk';
         const mirrorStr = mirrorType !== 'none' ? `_m${mirrorType.substring(0,1)}` : '';
         const preEffectStr = effectApplied ? `_fx-applied` : ''; // Indicate effects were applied
         const tileStr = `_t${elements.tilesXSlider?.value}x${elements.tilesYSlider?.value}`;
         const preTileStr = `_p${elements.preTileXSlider?.value}x${elements.preTileYSlider?.value}`;
         const scaleStr = `_sc${elements.scaleSlider?.value}`;
-        let shapeParams = ''; if (selectedShape === 'skewed') { /* ... */ }
+        let shapeParams = ''; if (selectedShape === 'skewed') { shapeParams = `_sk${elements.skewSlider?.value}_st${elements.staggerSlider?.value}`; }
         const baseName = state.originalFileName.substring(0, state.originalFileName.lastIndexOf('.')) || state.originalFileName;
         const extension = state.originalFileName.substring(state.originalFileName.lastIndexOf('.')) || '.png';
         link.download = `${baseName}${preEffectStr}_${shapeStr}${mirrorStr}${tileStr}${preTileStr}${shapeParams}${scaleStr}_${targetWidth}x${targetHeight}${extension}`
-            .replace(/_none/g,'').replace(/_fx-applied_fx-none/g,'_fx-applied') // Clean up
+            .replace(/_none/g,'').replace(/_fx-applied_fx-none/g,'_fx-applied')
             .replace(/__/g,'_').replace(/^_|_$/g, '');
 
         document.body.appendChild(link); link.click(); document.body.removeChild(link);
-        showMessage('Image saved successfully!', false, elements.messageBox);
-     } catch (error) { console.error('Error saving image:', error); showMessage(`Could not save the image: ${error.message}`, true, elements.messageBox); }
-}
+        showMessage('Image saved successfully!', false, elements.messageBox); //
+     } catch (error) { console.error('Error saving image:', error); showMessage(`Could not save the image: ${error.message}`, true, elements.messageBox); } //
+} //
 
 // --- Event Listeners Setup ---
 function setupEventListeners() {
@@ -468,55 +472,55 @@ function setupEventListeners() {
     // Tiling controls
     elements.tileShapeOptions?.forEach(opt => opt.addEventListener('change', handleOptionChange));
     elements.mirrorOptions?.forEach(opt => opt.addEventListener('change', handleOptionChange));
-    const tilingSliders = [ elements.tilesXSlider, /* ... */ elements.preTileYSlider ];
-    tilingSliders.forEach(slider => { if(slider) slider.addEventListener('input', handleSliderChange); });
+    const tilingSliders = [ elements.tilesXSlider, elements.tilesYSlider, elements.skewSlider, elements.staggerSlider, elements.scaleSlider, elements.preTileXSlider, elements.preTileYSlider ];
+    tilingSliders.forEach(slider => { if(slider) slider.addEventListener('input', handleSliderChange); }); // Tiling sliders trigger general handler
 
     // Pre-Effect controls trigger preview
     elements.preEffectSelector?.addEventListener('change', handleOptionChange);
-    setupSliderListener(elements.preEffectIntensitySlider, elements.preEffectIntensityValue, requestProcessAndPreview);
-    setupSliderListener(elements.preEffectWaveAmplitudeSlider, elements.preEffectWaveAmplitudeValue, requestProcessAndPreview);
-    setupSliderListener(elements.preEffectWaveFrequencySlider, elements.preEffectWaveFrequencyValue, requestProcessAndPreview);
-    setupSliderListener(elements.preEffectWavePhaseSlider, elements.preEffectWavePhaseValue, requestProcessAndPreview, val => val + '°');
+    setupSliderListener(elements.preEffectIntensitySlider, elements.preEffectIntensityValue, requestProcessAndPreview); //
+    setupSliderListener(elements.preEffectWaveAmplitudeSlider, elements.preEffectWaveAmplitudeValue, requestProcessAndPreview); //
+    setupSliderListener(elements.preEffectWaveFrequencySlider, elements.preEffectWaveFrequencyValue, requestProcessAndPreview); //
+    setupSliderListener(elements.preEffectWavePhaseSlider, elements.preEffectWavePhaseValue, requestProcessAndPreview, val => val + '°'); //
     elements.preEffectWaveDirection?.addEventListener('change', handleOptionChange);
     elements.preEffectWaveType?.addEventListener('change', handleOptionChange);
-    setupSliderListener(elements.sliceShiftIntensitySlider, elements.sliceShiftIntensityValue, requestProcessAndPreview);
+    setupSliderListener(elements.sliceShiftIntensitySlider, elements.sliceShiftIntensityValue, requestProcessAndPreview); //
     elements.sliceShiftDirection?.addEventListener('change', handleOptionChange);
-    setupSliderListener(elements.pixelSortThresholdSlider, elements.pixelSortThresholdValue, requestProcessAndPreview);
+    setupSliderListener(elements.pixelSortThresholdSlider, elements.pixelSortThresholdValue, requestProcessAndPreview); //
     elements.pixelSortDirection?.addEventListener('change', handleOptionChange);
     elements.pixelSortBy?.addEventListener('change', handleOptionChange);
 
     // Source Zoom, Output Dimensions, Panning listeners
-    elements.sourceZoomSlider?.addEventListener('input', () => handleSourceZoom( elements, state, () => updateSourcePreviewTransform(elements, state), handleSliderChange ));
-    elements.outputWidthInput?.addEventListener('input', (e) => handleDimensionChange(e, elements, state));
-    elements.outputHeightInput?.addEventListener('input', (e) => handleDimensionChange(e, elements, state));
-    elements.keepAspectRatioCheckbox?.addEventListener('change', () => { if (elements.keepAspectRatioCheckbox?.checked && state.currentImage) { handleDimensionChange({ target: elements.outputWidthInput }, elements, state); } });
-    elements.sourcePreviewContainer?.addEventListener('mousedown', (e) => startPan(e, elements, state));
+    elements.sourceZoomSlider?.addEventListener('input', () => handleSourceZoom( elements, state, () => updateSourcePreviewTransform(elements, state), handleSliderChange )); //
+    elements.outputWidthInput?.addEventListener('input', (e) => handleDimensionChange(e, elements, state)); //
+    elements.outputHeightInput?.addEventListener('input', (e) => handleDimensionChange(e, elements, state)); //
+    elements.keepAspectRatioCheckbox?.addEventListener('change', () => { if (elements.keepAspectRatioCheckbox?.checked && state.currentImage) { handleDimensionChange({ target: elements.outputWidthInput }, elements, state); } }); //
+    elements.sourcePreviewContainer?.addEventListener('mousedown', (e) => startPan(e, elements, state)); //
     document.addEventListener('mousemove', (e) => { if (!state || !state.currentImage || !state.isDragging) { return; } panMove( e, elements, state, () => updateSourcePreviewTransform(elements, state), handleSliderChange ); }); // Only pan if dragging
-    document.addEventListener('mouseup', () => endPan(elements, state));
-    elements.sourcePreviewContainer?.addEventListener('mouseleave', () => endPan(elements, state));
+    document.addEventListener('mouseup', () => endPan(elements, state)); //
+    elements.sourcePreviewContainer?.addEventListener('mouseleave', () => endPan(elements, state)); //
 
      console.log("setupEventListeners: Finished attaching listeners.");
-}
+} //
 
 
 // --- Initial Application State ---
 function initializeApp() {
      resetState(
          elements, state,
-         () => updateTilingControlsVisibility(elements, handleSliderChange),
-         () => updatePreEffectControlsVisibility(elements),
+         () => updateTilingControlsVisibility(elements, handleSliderChange), //
+         () => updatePreEffectControlsVisibility(elements), //
          handleSliderChange,
-         () => clearHistory(state, updateUndoRedoButtonsWrapper, elements) // Pass clearHistory
-     );
+         () => clearHistory(state, updateUndoRedoButtonsWrapper, elements) // Pass clearHistory callback
+     ); //
      // Ensure contexts are valid
      if (!state.sourceEffectCtx && elements.sourceEffectCanvas) { state.sourceEffectCtx = elements.sourceEffectCanvas.getContext('2d', { willReadFrequently: true }); }
-     if (!state.ctx && elements.canvas) { state.ctx = elements.canvas.getContext('2d', { willReadFrequently: true }); }
+     if (!state.ctx && elements.canvas) { state.ctx = elements.canvas.getContext('2d', { willReadFrequently: true }); } // Ensure final canvas ctx is in state
      if (!state.sourceEffectCtx || !state.ctx) { console.error("initializeApp: Failed to get required canvas contexts!"); }
 
      setupEventListeners();
      updateUndoRedoButtonsWrapper(); // Initial history button state
      console.log("Image Tiler Initialized with Apply Button Workflow");
-}
+} //
 
 // Start the application
-document.addEventListener('DOMContentLoaded', initializeApp);
+document.addEventListener('DOMContentLoaded', initializeApp); //
