@@ -1,4 +1,4 @@
-// js/main.js (Modified redrawSourceCanvasWithEffect for STACKING effects)
+// js/main.js (Includes Stacking Effects in redrawSourceCanvasWithEffect AND Pan/Zoom logic in requestFullUpdate)
 
 // --- Utility Imports ---
 import {
@@ -177,73 +177,145 @@ function redrawSourceCanvasWithEffect() {
 /**
  * Requests a full update of the final preview canvas.
  * Debounced to prevent excessive updates.
- * Ensures the sourceEffectCanvas reflects the LAST APPLIED state from history
- * before generating the final tiled preview. (Unchanged from previous version)
+ * MODIFIED: Ensures the sourceEffectCanvas reflects the LAST APPLIED state from history,
+ * *AND* extracts the currently panned/zoomed subsection onto it
+ * before generating the final tiled preview.
  */
 function requestFullUpdate() {
     console.log('[MainApp] requestFullUpdate called.');
     // Add checks for elements/state
-    if (!elements.sourceEffectCanvas || !state.currentImage) {
-        console.warn("[MainApp] requestFullUpdate skipped: elements or state not ready.");
+    // Need currentImage OR history to proceed
+    if ((!state.currentImage && state.history.length === 0) || !elements.sourceEffectCanvas || !state.sourceEffectCtx) {
+        console.warn("[MainApp] requestFullUpdate skipped: No image/history or canvas/context not ready.");
         return;
     }
+    if (state.isProcessing) { // Added check for isProcessing
+        console.warn("[MainApp] requestFullUpdate skipped: Already processing.");
+        return;
+    }
+
     if (state.debounceTimer) clearTimeout(state.debounceTimer);
-    state.debounceTimer = setTimeout(() => {
+
+    // Make the debounced function async to allow await for createImageBitmap
+    state.debounceTimer = setTimeout(async () => {
         console.log('[MainApp] Debounce timer finished. Initiating full update.');
-        // Ensure prerequisites are met
-        if (state.currentImage && !state.isProcessing && elements.sourceEffectCanvas && state.sourceEffectCtx) {
-             console.log('[MainApp] Prerequisites met for full update.');
 
-             // --- FIX Integration (Still relevant even with stacking) ---
-             // Always restore the last applied state from history onto the sourceEffectCanvas
-             // before generating the final tiled preview. This ensures changing the effect selector
-             // or sliders uses the *committed* state, not a live preview state.
-             const currentStateFromHistory = state.history[state.historyIndex];
-             if (currentStateFromHistory) {
-                 try {
-                     console.log('[MainApp] Restoring history state to sourceEffectCanvas before tiling.');
-                     // Make sure canvas size matches history state size
-                     if (elements.sourceEffectCanvas.width !== currentStateFromHistory.width || elements.sourceEffectCanvas.height !== currentStateFromHistory.height) {
-                         elements.sourceEffectCanvas.width = currentStateFromHistory.width;
-                         elements.sourceEffectCanvas.height = currentStateFromHistory.height;
-                         console.log(`[MainApp] Resized sourceEffectCanvas to match history state ${currentStateFromHistory.width}x${currentStateFromHistory.height}`);
-                     }
-                     state.sourceEffectCtx.putImageData(currentStateFromHistory, 0, 0);
-                 } catch (e) {
-                     console.error("[MainApp] Error putting history ImageData onto sourceEffectCanvas:", e);
-                     showMessage("Error restoring effect state for preview.", true, elements.messageBox);
-                     // state.isProcessing should be false here, but ensure it is
-                     state.isProcessing = false;
-                     return; // Stop if we cannot restore the state
-                 }
-             } else {
-                 // This case should ideally only happen right after image load, before the first apply.
-                 console.log('[MainApp] No history state found (or index invalid). Using current canvas state for tiling.');
-                 // Consider if redrawSourceCanvasWithEffect (stacking version) needs to be called here
-                 // ONLY if history is empty to ensure the initial image is drawn.
-                 // Let's rely on handleImageLoad setting the initial state correctly for now.
-             }
-
-             // Process the image for tiling using the sourceEffectCanvas,
-             // which now correctly holds the last *applied* state.
-             console.log('[MainApp] Calling processAndPreviewImage with restored/current canvas state.');
-             processAndPreviewImage(
-                 elements.sourceEffectCanvas, // This canvas now has the intended state
-                 elements,
-                 state,
-                 (msg, isErr) => showMessage(msg, isErr, elements.messageBox) // Pass message function
-             );
-             // --- End FIX Integration ---
-
-        } else {
-             // Log why the update was skipped more clearly
-             console.warn("[MainApp] Full update skipped inside timeout: Missing prerequisites.");
-             if(!state.currentImage) console.log(" Skipped reason: No current image.");
-             else if(state.isProcessing) console.log(" Skipped reason: Already processing.");
-             else if(!elements.sourceEffectCanvas) console.log(" Skipped reason: sourceEffectCanvas missing.");
-             else if(!state.sourceEffectCtx) console.log(" Skipped reason: sourceEffectCtx missing.");
-             else console.log(" Skipped reason: Unknown state issue.");
+        // Ensure prerequisites are still met inside the timeout
+        if ((!state.currentImage && state.history.length === 0) || state.isProcessing || !elements.sourceEffectCanvas || !state.sourceEffectCtx) {
+            console.warn("[MainApp] Full update skipped inside timeout: Prerequisites changed or missing.");
+             if(state.isProcessing) console.log(" Skipped reason: Now processing.");
+             else console.log(" Skipped reason: Image/history or canvas issue.");
+            return;
         }
+
+        console.log('[MainApp] Prerequisites met for full update processing.');
+        state.isProcessing = true; // Set processing flag
+
+        const canvas = elements.sourceEffectCanvas;
+        const ctx = state.sourceEffectCtx;
+        // Target dimensions for the canvas that processAndPreviewImage uses as input
+        // Should generally match the original aspect ratio base
+        const targetWidth = state.originalWidth;
+        const targetHeight = state.originalHeight;
+
+        if (!targetWidth || !targetHeight) {
+             console.error("requestFullUpdate: Invalid target dimensions (originalWidth/Height not set).");
+             state.isProcessing = false; // Reset flag
+             return;
+        }
+
+        // Ensure canvas is the correct size for the target output base
+        if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+           canvas.width = targetWidth;
+           canvas.height = targetHeight;
+           console.log(`[MainApp] Set sourceEffectCanvas size to ${canvas.width}x${canvas.height}`);
+        }
+        // Clear the target canvas before drawing the subsection
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        console.log('[MainApp] Cleared sourceEffectCanvas.');
+
+
+        // Get the latest state from history (full frame with effects)
+        const currentStateFromHistory = state.history[state.historyIndex];
+
+        try {
+            let sourceBitmap;
+            let sourceDataWidth;
+            let sourceDataHeight;
+
+            // Determine the source data (either latest history or original image)
+            if (currentStateFromHistory) {
+                console.log('[MainApp] Using latest history state as source.');
+                sourceDataWidth = currentStateFromHistory.width;
+                sourceDataHeight = currentStateFromHistory.height;
+                 // Use createImageBitmap for potentially better performance drawing subsections
+                sourceBitmap = await createImageBitmap(currentStateFromHistory);
+            } else if (state.currentImage) {
+                // Fallback for initial load before first effect apply
+                console.log('[MainApp] Using original image as source (no history).');
+                sourceDataWidth = state.originalWidth;
+                sourceDataHeight = state.originalHeight;
+                sourceBitmap = await createImageBitmap(state.currentImage);
+            } else {
+                // Should not happen if initial checks pass, but handle defensively
+                throw new Error("No source data available (no history or currentImage).");
+            }
+
+             if (!sourceBitmap) {
+                throw new Error("Failed to create ImageBitmap from source data.");
+            }
+             console.log(`[MainApp] Source data dimensions: ${sourceDataWidth}x${sourceDataHeight}`);
+
+
+            // --- Calculate the source rectangle based on current pan/zoom state ---
+            // sw/sh: Size of the rectangle *in the source data* to be sampled
+            const sourceRectWidth = sourceDataWidth / state.sourceZoomLevel;
+            const sourceRectHeight = sourceDataHeight / state.sourceZoomLevel;
+            // sx/sy: Top-left corner of the rectangle *in the source data* to be sampled
+            const sourceRectX = -state.currentOffsetX / state.sourceZoomLevel;
+            const sourceRectY = -state.currentOffsetY / state.sourceZoomLevel;
+
+            // Log calculated values
+            console.log(`  Pan/Zoom State: zoom=${state.sourceZoomLevel.toFixed(2)}, offsetX=${state.currentOffsetX.toFixed(2)}, offsetY=${state.currentOffsetY.toFixed(2)}`);
+            console.log(`  Calculated Source Rect: sx=${sourceRectX.toFixed(2)}, sy=${sourceRectY.toFixed(2)}, sw=${sourceRectWidth.toFixed(2)}, sh=${sourceRectHeight.toFixed(2)}`);
+            console.log(`  Target Draw Area: dx=0, dy=0, dw=${canvas.width}, dh=${canvas.height}`);
+
+            // --- Draw the calculated subsection onto the sourceEffectCanvas ---
+            if (sourceRectWidth > 0 && sourceRectHeight > 0) {
+                ctx.imageSmoothingEnabled = true; // Enable smoothing for zoom quality
+                ctx.imageSmoothingQuality = 'medium'; // Or 'high', balances performance/quality
+                ctx.drawImage(
+                    sourceBitmap,           // The source image data (full frame with effects)
+                    sourceRectX, sourceRectY,       // Source rect top-left (sx, sy)
+                    sourceRectWidth, sourceRectHeight, // Source rect dimensions (sw, sh)
+                    0, 0,                           // Destination top-left (dx, dy)
+                    canvas.width, canvas.height     // Destination dimensions (dw, dh) - fill the canvas
+                );
+                console.log('[MainApp] Drew panned/zoomed subsection onto sourceEffectCanvas.');
+            } else {
+                 console.warn('[MainApp] Skipping drawImage - calculated source dimensions are invalid (<= 0).');
+                 // Canvas will remain clear - perhaps show an error?
+                 showMessage("Error: Invalid zoom or source dimensions.", true, elements.messageBox);
+            }
+
+            // --- Generate the final tiled preview ---
+            // Now sourceEffectCanvas holds the correct panned/zoomed view of the image with stacked effects.
+            console.log('[MainApp] Calling processAndPreviewImage with panned/zoomed canvas state.');
+            processAndPreviewImage(
+                canvas, // This canvas now has the intended panned/zoomed + effected state
+                elements,
+                state,
+                (msg, isErr) => showMessage(msg, isErr, elements.messageBox)
+            );
+
+        } catch (err) {
+             console.error("Error during requestFullUpdate image processing:", err);
+             showMessage(`Error updating preview: ${err.message}`, true, elements.messageBox);
+        } finally {
+            state.isProcessing = false; // Reset processing flag IMPORTANT
+            console.log('[MainApp] Finished full update processing.');
+        }
+
     }, 150); // Debounce time
 }
 
@@ -254,7 +326,7 @@ function requestFullUpdate() {
  * Handles the click event for the "Apply Pre-Effect" button.
  * Redraws the source canvas by applying the currently selected effect on top
  * of the previous state (stacking), then pushes the resulting ImageData onto
- * the history stack. (Unchanged logic flow from previous version)
+ * the history stack.
  */
 function handleApplyEffectClick() {
     console.log('[MainApp] Apply Pre-Effect button clicked.');
@@ -306,7 +378,6 @@ function handleApplyEffectClick() {
 
 /**
  * Handles the Undo button click. Reverts to the previous state in history.
- * (Unchanged from previous version)
  */
 function handleUndoClick() {
     console.log('[MainApp] Undo button clicked.');
@@ -322,7 +393,6 @@ function handleUndoClick() {
 
 /**
  * Handles the Redo button click. Moves to the next state in history.
- * (Unchanged from previous version)
  */
 function handleRedoClick() {
     console.log('[MainApp] Redo button clicked.');
@@ -338,7 +408,6 @@ function handleRedoClick() {
 
 /**
  * Gets the currently selected effect name and its parameters from the UI controls.
- * (Unchanged from previous version)
  * @returns {{effect: string, params: object}}
  */
 function getCurrentEffectAndParams() {
@@ -389,7 +458,6 @@ function getCurrentEffectAndParams() {
 /**
  * Handles changes for TILING sliders (Tiles X/Y, Skew, Stagger, Scale, Pre-Tile X/Y).
  * Updates the value display spans and requests a full preview update.
- * (Unchanged from previous version)
  */
 function handleSliderChange() {
     console.log('[MainApp] handleSliderChange called (likely Tiling or shared slider).');
@@ -410,7 +478,6 @@ function handleSliderChange() {
 /**
  * Handles changes for radio buttons (Tile Shape, Mirroring) and select dropdowns (Effects, Directions, etc.).
  * Updates UI visibility if needed and requests a full preview update.
- * (Unchanged from previous version)
  */
 function handleOptionChange(event) {
     const target = event.target;
@@ -461,7 +528,6 @@ function handleOptionChange(event) {
 /**
  * Handles the loading of a new image file.
  * Resets state, loads the image, initializes canvases and history, enables controls.
- * (Unchanged logic flow from previous version, ensures redrawSourceCanvasWithEffect is called initially)
  */
 function handleImageLoad(event) {
     console.log("[MainApp] handleImageLoad: Function triggered.");
@@ -620,11 +686,10 @@ function handleImageLoad(event) {
 
 /**
  * Handles saving the final processed image from the main canvas.
- * (Unchanged from previous version)
  */
 function saveImage() {
     console.log("[MainApp] saveImage called.");
-     if (!elements.canvas || !state.currentImage && state.history.length === 0) { // Check image or history
+     if (!elements.canvas || (!state.currentImage && state.history.length === 0)) { // Check image or history
         console.warn("[MainApp] Save cancelled: Canvas not ready or no image/history.");
         showMessage("Cannot save: No image processed yet.", true, elements.messageBox);
         return;
@@ -679,7 +744,6 @@ function saveImage() {
 }
 
 // --- Event Listeners Setup ---
-// (Unchanged from previous version)
 function setupEventListeners() {
      console.log("[MainApp] setupEventListeners: Attaching listeners...");
     // Ensure elements are available before adding listeners
@@ -732,7 +796,7 @@ function setupEventListeners() {
                  // Update the visual transform of the source preview
                  handleSourceZoom(elements, state, () => updateSourcePreviewTransform(elements, state));
                  // Request a full update of the final tiled preview
-                 // Note: This will now use the STACKED effect from history via requestFullUpdate's logic
+                 // This will now use the updated requestFullUpdate logic
                  requestFullUpdate();
              },
              val => parseFloat(val).toFixed(1) // Formatter for display
@@ -764,7 +828,7 @@ function setupEventListeners() {
                  console.log('[MainApp] Pan ended.');
                  // Call endPan which sets isDragging = false
                  // Pass requestFullUpdate as the callback to update the final preview after panning stops
-                 endPan(elements, state, requestFullUpdate);
+                 endPan(elements, state, requestFullUpdate); // This will use the updated requestFullUpdate
              }
          };
          document.addEventListener('mouseup', endPanHandler);
@@ -777,7 +841,6 @@ function setupEventListeners() {
 
 
 // --- Initial Application State Setup ---
-// (Unchanged from previous version)
 function initializeApp() {
      console.log("[MainApp] Initializing application...");
 
@@ -800,10 +863,10 @@ function initializeApp() {
          finalPreviewText: document.getElementById('finalPreviewText'),
 
          // Canvases (ensure IDs match HTML)
-         mirrorCanvas: document.getElementById('mirrorCanvas'),         // Used in tiling/core
-         preTileCanvas: document.getElementById('preTileCanvas'),       // Used in tiling/core
-         canvas: document.getElementById('imageCanvas'),             // Final output canvas (used for saving, updated by tiling/core)
-         sourceEffectCanvas: document.getElementById('sourceEffectCanvas'), // Main working canvas for effects & history
+         mirrorCanvas: document.getElementById('mirrorCanvas'),
+         preTileCanvas: document.getElementById('preTileCanvas'),
+         canvas: document.getElementById('imageCanvas'),
+         sourceEffectCanvas: document.getElementById('sourceEffectCanvas'),
 
          // History Buttons
          applyEffectButton: document.getElementById('applyEffectButton'),
@@ -901,33 +964,21 @@ function initializeApp() {
      }
 
      state = {
-         currentImage: null,          // Holds the original loaded Image object
-         originalImageData: null,     // Holds the initial ImageData after load (base for history)
+         currentImage: null,
+         originalImageData: null,
          originalFileName: 'downloaded-image.png',
          originalWidth: 0, originalHeight: 0, originalAspectRatio: 1,
-
-         // Status flags
-         isProcessing: false,         // Flag to prevent concurrent processing
-         isDragging: false,           // Flag for panning state
-
-         // Timers
-         debounceTimer: null,         // Timer for debouncing updates
-
-         // Panning state
+         isProcessing: false,
+         isDragging: false,
+         debounceTimer: null,
          dragStartX: 0, dragStartY: 0,
-         currentOffsetX: 0, currentOffsetY: 0, // Current translation of the source preview
-         startOffsetX: 0, startOffsetY: 0,   // Offset at the start of a drag
-
-         // Zoom state
-         sourceZoomLevel: 1.0,        // Zoom level of the source preview
-
-         // Canvas contexts
-         sourceEffectCtx: initialSourceEffectCtx, // Primary context for applying effects and history ( MANDATORY )
-         ctx: initialSourceEffectCtx, // Make state.ctx explicitly point to the main working context
-
-         // History
-         history: [],                 // Array to store ImageData states
-         historyIndex: -1             // Index of the current state in the history array
+         currentOffsetX: 0, currentOffsetY: 0,
+         startOffsetX: 0, startOffsetY: 0,
+         sourceZoomLevel: 1.0,
+         sourceEffectCtx: initialSourceEffectCtx,
+         ctx: initialSourceEffectCtx, // Point state.ctx to the same context for history utils
+         history: [],
+         historyIndex: -1
      };
      console.log("[MainApp] State object initialized.");
 
@@ -936,10 +987,9 @@ function initializeApp() {
      const resetCallbacks = {
          updateTiling: () => updateTilingControlsVisibility(elements, handleSliderChange),
          updateEffects: () => updatePreEffectControlsVisibility(elements),
-         updateSliders: handleSliderChange, // Ensures slider display values match defaults
-         clearHistory: () => clearHistory(state, updateUndoRedoButtons, elements) // Pass the history clearing function
+         updateSliders: handleSliderChange,
+         clearHistory: () => clearHistory(state, updateUndoRedoButtons, elements)
      };
-     // Perform the initial reset
      resetState(
          elements, state,
          resetCallbacks.updateTiling, resetCallbacks.updateEffects,
@@ -952,11 +1002,10 @@ function initializeApp() {
      setupEventListeners();
 
      // --- Final Initial UI State ---
-     updateUndoRedoButtons(elements, state); // Ensure undo/redo are initially disabled
+     updateUndoRedoButtons(elements, state);
      console.log("[MainApp] Image Tiler Initialized and ready.");
      showMessage("Load an image to begin.", false, elements.messageBox);
 }
 
 // --- Start the application ---
-// Wait for the DOM to be fully loaded before initializing
 document.addEventListener('DOMContentLoaded', initializeApp);
