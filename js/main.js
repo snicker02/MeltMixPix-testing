@@ -1,28 +1,33 @@
-// js/main.js (Refactored to use stateManager.js)
+// js/main.js (Refactored to use stateManager.js - Corrected uiUtils import v2)
 
 // --- Utility Imports ---
 import {
     showMessage, updateTilingControlsVisibility, updatePreEffectControlsVisibility,
-    updateSourcePreviewTransform, handleDimensionChange, resetState as resetUIState, // Renamed resetState to avoid conflict
+    updateSourcePreviewTransform, handleDimensionChange, resetUIState, // <<< CORRECTED IMPORT NAME
     startPan, panMove, endPan, handleSourceZoom, setupSliderListener
  } from './utils/uiUtils.js';
 import { processAndPreviewImage } from './tiling/core.js';
-// <<< REMOVE historyUtils import >>>
-// import { updateUndoRedoButtons, clearHistory, pushHistoryState, undo as historyUndo, redo as historyRedo } from './utils/historyUtils.js';
+// historyUtils import removed
 
 // <<< ADD stateManager import >>>
 import * as stateManager from './stateManager.js';
 
 // --- Effect Imports --- (Keep these)
 import { applyNoise } from './effects/noise.js';
-// ... other effect imports ...
+import { applyScanLines } from './effects/scanLines.js';
+import { applyWaveDistortion } from './effects/waveDistortion.js';
+import { applyFractalZoom } from './effects/fractalZoom.js';
+import { applySliceShift } from './effects/sliceShift.js';
+import { applyPixelSort } from './effects/pixelSort.js';
+import { applyChannelShift } from './effects/channelShift.js';
+import { applyBlockDisplace } from './effects/blockDisplace.js';
+import { applyInvertBlocks } from './effects/invertBlocks.js';
 import { applySierpinski } from './effects/sierpinski.js';
 
 
 // --- Global Scope ---
 let elements = {}; // Holds references to DOM elements
-// <<< REMOVE state object definition >>>
-// let state = {};
+// state object removed
 
 // Keep references to contexts needed by functions in this file
 let sourceEffectCtx = null;
@@ -51,7 +56,7 @@ let sourceEffectCtx = null;
  * @returns {boolean} True if successful, false otherwise.
  */
 function redrawSourceCanvasWithEffect() {
-    console.log('[MainApp] redrawSourceCanvasWithEffect (STACKING) - START');
+    // console.log('[MainApp] redrawSourceCanvasWithEffect (STACKING) - START');
     // Use state manager for checks
     const { width: originalWidth, height: originalHeight } = stateManager.getOriginalDimensions();
     const currentHistoryStateForDimensions = stateManager.getCurrentHistoryState(); // Check current state
@@ -94,7 +99,7 @@ function redrawSourceCanvasWithEffect() {
          try {
             ctx.putImageData(previousState, 0, 0);
             baseImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        } catch (e) { /* ... error handling ... */ return false; }
+        } catch (e) { console.error(" redrawSourceCanvasWithEffect: Error putting previous history state onto canvas:", e); return false; }
     } else {
         // console.log(" redrawSourceCanvasWithEffect: No previous history state found, starting from original panned/zoomed image.");
          if (!currentImage || !originalWidth || !originalHeight) {
@@ -119,7 +124,7 @@ function redrawSourceCanvasWithEffect() {
             }
             ctx.drawImage( currentImage, sourceRectX, sourceRectY, sourceRectWidth, sourceRectHeight, 0, 0, canvas.width, canvas.height );
             baseImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        } catch (e) { /* ... error handling ... */ return false; }
+        } catch (e) { console.error(" redrawSourceCanvasWithEffect: Error drawing initial source image:", e); return false; }
     }
 
     // Apply the *currently selected* effect
@@ -134,7 +139,7 @@ function redrawSourceCanvasWithEffect() {
              const effectContext = { sourceImageData: baseImageData };
              effectFunction(currentImageDataOnCanvas, params, effectContext); // Apply effect
              ctx.putImageData(currentImageDataOnCanvas, 0, 0); // Put result back
-        } catch (e) { /* ... error handling ... */ return false; }
+        } catch (e) { console.error(` redrawSourceCanvasWithEffect: Error applying effect '${effect}':`, e); return false; }
     } else {
         // console.log(" redrawSourceCanvasWithEffect: No effect selected ('none'). Canvas shows previous state.");
     }
@@ -148,7 +153,7 @@ function redrawSourceCanvasWithEffect() {
  * Uses stateManager for checks and data retrieval.
  */
 function requestFullUpdate() {
-    console.log('[MainApp] requestFullUpdate called.');
+    // console.log('[MainApp] requestFullUpdate called.');
 
     // Use state manager for checks
     const historyInfo = stateManager.getHistoryInfo();
@@ -156,15 +161,15 @@ function requestFullUpdate() {
     const check2 = !elements.sourceEffectCanvas;
     const check3 = !sourceEffectCtx; // Use local context variable
     const isProcessing = stateManager.isProcessing();
-    console.log(` requestFullUpdate PRE-CHECKS: NoImage&History=${check1}, NoCanvas=${check2}, NoCtx=${check3}, IsProcessing=${isProcessing}`);
+    // console.log(` requestFullUpdate PRE-CHECKS: NoImage&History=<span class="math-inline">\{check1\}, NoCanvas\=</span>{check2}, NoCtx=<span class="math-inline">\{check3\}, IsProcessing\=</span>{isProcessing}`);
 
 
     if (check1 || check2 || check3) {
-        console.warn(" requestFullUpdate skipped (OUTSIDE setTimeout): Prerequisites failed.");
+        // console.warn(" requestFullUpdate skipped (OUTSIDE setTimeout): Prerequisites failed.");
         return;
     }
     if (isProcessing) {
-        console.warn(" requestFullUpdate skipped (OUTSIDE setTimeout): Already processing.");
+        // console.warn(" requestFullUpdate skipped (OUTSIDE setTimeout): Already processing.");
         return;
     }
 
@@ -177,7 +182,7 @@ function requestFullUpdate() {
     }
 
     debounceTimer = setTimeout(async () => {
-        console.log('[MainApp] Debounce timer finished. Initiating full update.');
+        // console.log('[MainApp] Debounce timer finished. Initiating full update.');
 
         // Re-check prerequisites using state manager inside timeout
         const inHistoryInfo = stateManager.getHistoryInfo();
@@ -185,18 +190,18 @@ function requestFullUpdate() {
         const inCheck2 = !elements.sourceEffectCanvas;
         const inCheck3 = !sourceEffectCtx;
         const inIsProcessing = stateManager.isProcessing(); // Re-check processing status
-         console.log(` requestFullUpdate INSIDE TIMEOUT PRE-CHECKS: NoImage&History=${inCheck1}, NoCanvas=${inCheck2}, NoCtx=${inCheck3}, IsProcessing=${inIsProcessing}`);
+        // console.log(` requestFullUpdate INSIDE TIMEOUT PRE-CHECKS: NoImage&History=<span class="math-inline">\{inCheck1\}, NoCanvas\=</span>{inCheck2}, NoCtx=<span class="math-inline">\{inCheck3\}, IsProcessing\=</span>{inIsProcessing}`);
 
 
         if (inCheck1 || inIsProcessing || inCheck2 || inCheck3) {
-            console.warn(" requestFullUpdate: Full update skipped inside timeout: Prerequisites failed or already processing.");
-             /* ... logging reasons ... */
+            // console.warn(" requestFullUpdate: Full update skipped inside timeout: Prerequisites failed or already processing.");
+            /* ... logging reasons ... */
             return;
         }
 
-        console.log(' requestFullUpdate: Prerequisites met for full update processing.');
+        // console.log(' requestFullUpdate: Prerequisites met for full update processing.');
         stateManager.setProcessing(true); // Set processing flag via manager
-        console.log(' requestFullUpdate: Set isProcessing = true');
+        // console.log(' requestFullUpdate: Set isProcessing = true');
 
 
         const canvas = elements.sourceEffectCanvas;
@@ -207,14 +212,14 @@ function requestFullUpdate() {
         if (!targetWidth || !targetHeight) {
              console.error(" requestFullUpdate: Invalid target dimensions (originalWidth/Height not set).");
              stateManager.setProcessing(false); // Reset flag via manager
-             console.log(' requestFullUpdate: Reset isProcessing = false due to invalid dimensions.');
+             // console.log(' requestFullUpdate: Reset isProcessing = false due to invalid dimensions.');
              return;
         }
 
         if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
            canvas.width = targetWidth;
            canvas.height = targetHeight;
-           console.log(` requestFullUpdate: Set sourceEffectCanvas size to ${canvas.width}x${canvas.height}`);
+        //    console.log(` requestFullUpdate: Set sourceEffectCanvas size to <span class="math-inline">\{canvas\.width\}x</span>{canvas.height}`);
         }
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -265,24 +270,23 @@ function requestFullUpdate() {
                  showMessage("Error: Invalid zoom or source dimensions.", true, elements.messageBox);
             }
 
-            console.log(' requestFullUpdate: >>> Preparing to call processAndPreviewImage <<<');
+            // console.log(' requestFullUpdate: >>> Preparing to call processAndPreviewImage <<<');
             // Pass necessary state info to processAndPreviewImage if it needs it
-            // For now, assume it only needs the prepared canvas and elements
             processAndPreviewImage(
                 canvas,     // The prepared canvas (panned/zoomed subsection with effects)
                 elements,
                 stateManager.getState(), // Pass snapshot of current state if needed by tiling logic
                 (msg, isErr) => showMessage(msg, isErr, elements.messageBox)
             );
-             console.log(' requestFullUpdate: <<< processAndPreviewImage call finished >>>');
+            // console.log(' requestFullUpdate: <<< processAndPreviewImage call finished >>>');
 
         } catch (err) {
              console.error(" requestFullUpdate: Error during image processing:", err);
              showMessage(`Error updating preview: ${err.message}`, true, elements.messageBox);
         } finally {
             stateManager.setProcessing(false); // Reset processing flag via manager
-            console.log(' requestFullUpdate: Reset isProcessing = false in finally block.');
-             console.log('[MainApp] Finished full update processing.');
+            // console.log(' requestFullUpdate: Reset isProcessing = false in finally block.');
+            // console.log('[MainApp] Finished full update processing.');
         }
 
     }, 150); // Debounce time
@@ -307,56 +311,51 @@ function updateHistoryButtonsUI() {
  * Uses stateManager for history operations.
  */
 function handleApplyEffectClick() {
-    console.log('[MainApp] handleApplyEffectClick - START');
+    // console.log('[MainApp] handleApplyEffectClick - START');
     // Use state manager for checks
     const historyInfo = stateManager.getHistoryInfo();
     if (!stateManager.getCurrentImage() && historyInfo.length === 0) {
-        console.warn(' handleApplyEffectClick: Apply skipped: No image loaded or history base.');
-        showMessage("Load an image first.", true, elements.messageBox);
-        return;
+        showMessage("Load an image first.", true, elements.messageBox); return;
     }
-     if (!elements.sourceEffectCanvas || !sourceEffectCtx) { /* ... error handling ... */ return; }
-    if (stateManager.isProcessing()) { /* ... error handling ... */ return; }
+     if (!elements.sourceEffectCanvas || !sourceEffectCtx) { return; }
+    if (stateManager.isProcessing()) { return; }
 
     const { effect, params } = getCurrentEffectAndParams();
-    console.log(` handleApplyEffectClick: Effect to apply: '${effect}'`);
+    // console.log(` handleApplyEffectClick: Effect to apply: '${effect}'`);
 
-    console.log(` handleApplyEffectClick: Calling redrawSourceCanvasWithEffect to apply '${effect}' (stacking)...`);
+    // console.log(` handleApplyEffectClick: Calling redrawSourceCanvasWithEffect to apply '${effect}' (stacking)...`);
     if (!redrawSourceCanvasWithEffect()) {
-         console.error(` handleApplyEffectClick: redrawSourceCanvasWithEffect FAILED for effect '${effect}'.`);
-         showMessage("Could not apply effect due to processing error.", true, elements.messageBox);
-         return;
+         showMessage("Could not apply effect due to processing error.", true, elements.messageBox); return;
     }
 
     try {
-        console.log(" handleApplyEffectClick: Attempting to get ImageData after applying effect...");
+        // console.log(" handleApplyEffectClick: Attempting to get ImageData after applying effect...");
         const imageDataToSave = sourceEffectCtx.getImageData(0, 0, elements.sourceEffectCanvas.width, elements.sourceEffectCanvas.height);
-        console.log(" handleApplyEffectClick: Got ImageData. Attempting stateManager.pushHistoryState...");
+        // console.log(" handleApplyEffectClick: Got ImageData. Attempting stateManager.pushHistoryState...");
         stateManager.pushHistoryState(imageDataToSave); // Use state manager
         updateHistoryButtonsUI(); // Update buttons after history changes
-        console.log(" handleApplyEffectClick: pushHistoryState completed.");
+        // console.log(" handleApplyEffectClick: pushHistoryState completed.");
         showMessage(`Effect "${effect || 'None'}" applied (stacked) and saved to history.`, false, elements.messageBox);
 
-        console.log(" handleApplyEffectClick: Requesting full update after apply.");
+        // console.log(" handleApplyEffectClick: Requesting full update after apply.");
         requestFullUpdate();
 
-    } catch (e) { /* ... error handling ... */ }
-    console.log('[MainApp] handleApplyEffectClick - END');
+    } catch (e) { console.error(" handleApplyEffectClick: Error getting ImageData after applying effect or pushing history:", e); }
+    // console.log('[MainApp] handleApplyEffectClick - END');
 }
 
 /**
  * Handles the Undo button click. Uses stateManager.
  */
 function handleUndoClick() {
-    console.log('[MainApp] handleUndoClick - START');
-    if (!sourceEffectCtx) { /* ... error handling ... */ return; }
-    const historyInfo = stateManager.getHistoryInfo(); // Check state before attempting
-    if (historyInfo.index <= 0) { console.log(' handleUndoClick: Undo skipped: Already at oldest state.'); return; }
+    // console.log('[MainApp] handleUndoClick - START');
+    if (!sourceEffectCtx) { return; }
+    const historyInfo = stateManager.getHistoryInfo();
+    if (historyInfo.index <= 0) { return; }
 
     const previousImageData = stateManager.undoState(); // Use state manager
 
     if (previousImageData) {
-         // Put the undone state onto the canvas
          try {
              if (elements.sourceEffectCanvas.width !== previousImageData.width || elements.sourceEffectCanvas.height !== previousImageData.height) {
                  elements.sourceEffectCanvas.width = previousImageData.width;
@@ -364,31 +363,26 @@ function handleUndoClick() {
              }
              sourceEffectCtx.putImageData(previousImageData, 0, 0);
              updateHistoryButtonsUI(); // Update buttons
-             console.log(' handleUndoClick: Requesting full update after undo.');
+            //  console.log(' handleUndoClick: Requesting full update after undo.');
              requestFullUpdate(); // Update preview to reflect undone state
              showMessage("Undo successful.", false, elements.messageBox);
-         } catch(e) {
-            console.error(" handleUndoClick: Error putting undone state on canvas:", e);
-            showMessage("Error applying undo.", true, elements.messageBox);
-            // Consider how to handle state if putImageData fails
-         }
+         } catch(e) { console.error(" handleUndoClick: Error putting undone state on canvas:", e); }
     }
-    console.log('[MainApp] handleUndoClick - END');
+    // console.log('[MainApp] handleUndoClick - END');
 }
 
 /**
  * Handles the Redo button click. Uses stateManager.
  */
 function handleRedoClick() {
-    console.log('[MainApp] handleRedoClick - START');
-     if (!sourceEffectCtx) { /* ... error handling ... */ return; }
-      const historyInfo = stateManager.getHistoryInfo(); // Check state before attempting
-     if (historyInfo.index >= historyInfo.length - 1) { console.log(' handleRedoClick: Redo skipped: Already at newest state.'); return; }
+    // console.log('[MainApp] handleRedoClick - START');
+     if (!sourceEffectCtx) { return; }
+      const historyInfo = stateManager.getHistoryInfo();
+     if (historyInfo.index >= historyInfo.length - 1) { return; }
 
     const nextImageData = stateManager.redoState(); // Use state manager
 
      if (nextImageData) {
-         // Put the redone state onto the canvas
          try {
              if (elements.sourceEffectCanvas.width !== nextImageData.width || elements.sourceEffectCanvas.height !== nextImageData.height) {
                  elements.sourceEffectCanvas.width = nextImageData.width;
@@ -396,100 +390,154 @@ function handleRedoClick() {
              }
              sourceEffectCtx.putImageData(nextImageData, 0, 0);
              updateHistoryButtonsUI(); // Update buttons
-             console.log(' handleRedoClick: Requesting full update after redo.');
+            //  console.log(' handleRedoClick: Requesting full update after redo.');
              requestFullUpdate(); // Update preview to reflect redone state
              showMessage("Redo successful.", false, elements.messageBox);
-        } catch(e) {
-            console.error(" handleRedoClick: Error putting redone state on canvas:", e);
-            showMessage("Error applying redo.", true, elements.messageBox);
-        }
+        } catch(e) { console.error(" handleRedoClick: Error putting redone state on canvas:", e); }
     }
-    console.log('[MainApp] handleRedoClick - END');
+    // console.log('[MainApp] handleRedoClick - END');
 }
 
 /**
  * Gets the currently selected effect name and its parameters from the UI controls.
  * (No changes needed here as it only reads UI elements)
  */
-function getCurrentEffectAndParams() { /* ... same as before ... */ }
+function getCurrentEffectAndParams() {
+     const effect = elements.preEffectSelector?.value || 'none';
+    const params = {
+        intensity: parseInt(elements.preEffectIntensitySlider?.value || 30, 10)
+    };
+    switch (effect) {
+        case 'waveDistortion':
+            params.amplitude = parseInt(elements.preEffectWaveAmplitudeSlider?.value || 10, 10);
+            params.frequency = parseInt(elements.preEffectWaveFrequencySlider?.value || 5, 10);
+            params.phase = parseInt(elements.preEffectWavePhaseSlider?.value || 0, 10) * (Math.PI / 180);
+            params.direction = elements.preEffectWaveDirection?.value || 'horizontal';
+            params.waveType = elements.preEffectWaveType?.value || 'sine';
+            delete params.intensity;
+            break;
+        case 'sliceShift':
+            params.intensity = parseInt(elements.sliceShiftIntensitySlider?.value || 30, 10);
+            params.direction = elements.sliceShiftDirection?.value || 'horizontal';
+            break;
+        case 'pixelSort':
+            params.threshold = parseInt(elements.pixelSortThresholdSlider?.value || 100, 10);
+            params.direction = elements.pixelSortDirection?.value || 'horizontal';
+            params.sortBy = elements.pixelSortBy?.value || 'brightness';
+            delete params.intensity;
+            break;
+        case 'scanLines':
+             params.intensity = parseInt(elements.preEffectIntensitySlider?.value || 50, 10);
+            break;
+        // Effects using generic intensity:
+        case 'noise': case 'channelShift': case 'blockDisplace': case 'invertBlocks': case 'sierpinski': case 'fractalZoom': break;
+    }
+    return { effect, params };
+}
 
 /**
  * Handles changes for TILING sliders. Calls requestFullUpdate.
  * (No changes needed here)
  */
-function handleSliderChange() { /* ... same as before, calls requestFullUpdate ... */ }
+function handleSliderChange() {
+    if(elements.tilesXValueSpan && elements.tilesXSlider) elements.tilesXValueSpan.textContent = elements.tilesXSlider.value;
+    if(elements.tilesYValueSpan && elements.tilesYSlider) elements.tilesYValueSpan.textContent = elements.tilesYSlider.value;
+    if(elements.skewValueSpan && elements.skewSlider) elements.skewValueSpan.textContent = parseFloat(elements.skewSlider.value).toFixed(1);
+    if(elements.staggerValueSpan && elements.staggerSlider) elements.staggerValueSpan.textContent = parseFloat(elements.staggerSlider.value).toFixed(2);
+    if(elements.scaleValueSpan && elements.scaleSlider) elements.scaleValueSpan.textContent = parseFloat(elements.scaleSlider.value).toFixed(2);
+    if(elements.preTileXValueSpan && elements.preTileXSlider) elements.preTileXValueSpan.textContent = elements.preTileXSlider.value;
+    if(elements.preTileYValueSpan && elements.preTileYSlider) elements.preTileYValueSpan.textContent = elements.preTileYSlider.value;
+    requestFullUpdate();
+}
 
 /**
  * Handles changes for radio buttons and select dropdowns. Calls relevant UI updates and requestFullUpdate.
  * (No changes needed here)
  */
-function handleOptionChange(event) { /* ... same as before ... */ }
+function handleOptionChange(event) {
+    const target = event.target;
+    if (!target) return;
+
+    let needsFullUpdate = false;
+    let needsControlVisibilityUpdate = false;
+    let sourceIsTilingShape = false;
+
+    if (target.name === 'tileShape' || target.name === 'mirrorOption') {
+        if(target.name === 'tileShape') {
+             needsControlVisibilityUpdate = true;
+             sourceIsTilingShape = true;
+        } else {
+            needsFullUpdate = true;
+        }
+    }
+    else if (target.id === 'preEffectSelector' || target.closest('#preEffectOptionsContainer')) {
+         if(target.id === 'preEffectSelector') {
+             needsControlVisibilityUpdate = true;
+         }
+         needsFullUpdate = true;
+    }
+
+    if (needsControlVisibilityUpdate) {
+        if (sourceIsTilingShape) {
+             if(elements.tilesXSlider) updateTilingControlsVisibility(elements, handleSliderChange);
+        } else if (target.id === 'preEffectSelector') {
+             if(elements.preEffectSelector) updatePreEffectControlsVisibility(elements);
+        }
+    }
+    if (needsFullUpdate && !sourceIsTilingShape) {
+        requestFullUpdate();
+    }
+}
 
 
 /**
  * Handles the loading of a new image file. Uses stateManager.
  */
 function handleImageLoad(event) {
-    console.log("[MainApp] handleImageLoad - START");
+    // console.log("[MainApp] handleImageLoad - START");
     try {
-        if (!elements.messageBox || !elements.sourceEffectCanvas || !elements.imageLoader || !sourceEffectCtx) { // Added sourceEffectCtx check
+        if (!elements.messageBox || !elements.sourceEffectCanvas || !elements.imageLoader || !sourceEffectCtx) {
              console.error(" handleImageLoad: Cannot run - prerequisites missing.");
              if(elements.imageLoader) elements.imageLoader.value = '';
              return;
         }
-        console.log(" handleImageLoad: Prerequisites met.");
 
-        // Modified reset function to use stateManager.clearHistoryState
         const resetApp = () => {
-            console.log(" handleImageLoad: Calling resetApp (UI reset + state reset).");
-            // Reset UI via uiUtils function
-            resetUIState(elements, {}, // Pass empty object for state to resetUIState, it doesn't use it directly anymore
+            // console.log(" handleImageLoad: Calling resetApp (UI reset + state reset).");
+            resetUIState(elements,
                 () => updateTilingControlsVisibility(elements, handleSliderChange),
                 () => updatePreEffectControlsVisibility(elements),
                 handleSliderChange,
-                () => { // Pass the history clearing part separately
-                    stateManager.clearHistoryState();
-                    updateHistoryButtonsUI(); // Update buttons after clearing
-                }
+                updateHistoryButtonsUI
             );
-            // Reset state data via stateManager
             stateManager.resetStateData();
              if (elements.messageBox) showMessage("Ready to load a new image.", false, elements.messageBox);
              if(elements.imageLoader) elements.imageLoader.value = '';
-            console.log(" handleImageLoad: resetApp finished.");
         };
 
         const file = event.target.files?.[0];
-        if (!file) { console.log(" handleImageLoad: No file selected."); return; }
-        console.log(` handleImageLoad: File selected: ${file.name}, Type: ${file.type}`);
+        if (!file) { return; }
         if (!file.type.startsWith('image/')) {
-            console.warn(" handleImageLoad: Invalid file type selected:", file.type);
-            showMessage("Invalid file type. Please select an image (PNG, JPG, GIF).", true, elements.messageBox);
-            resetApp(); // Use combined reset function
-            return;
+            showMessage("Invalid file type.", true, elements.messageBox); resetApp(); return;
         }
 
         showMessage("Loading image...", false, elements.messageBox);
-        // Keep originalFileName locally or pass it to setImageData? Pass it.
         const originalFileName = file.name;
-
         const reader = new FileReader();
+
         reader.onload = (e) => {
-             if (!e.target?.result) { /* ... error handling ... */ resetApp(); return; }
+             if (!e.target?.result) { resetApp(); return; }
             const img = new Image();
             img.onload = () => {
-                 console.log(" handleImageLoad: img.onload - START");
-                 if (!img.naturalWidth || !img.naturalHeight) { /* ... error handling ... */ resetApp(); return; }
+                 if (!img.naturalWidth || !img.naturalHeight) { resetApp(); return; }
 
-                 // --- Update State using stateManager ---
-                 stateManager.setImageData(img, originalFileName); // This sets image, dimensions, resets pan/zoom etc.
-                 stateManager.clearHistoryState(); // Explicitly clear history for new image
+                 stateManager.setImageData(img, originalFileName);
+                 stateManager.clearHistoryState();
 
-                 // --- Update UI Elements ---
-                 if(elements.outputWidthInput) elements.outputWidthInput.value = img.naturalWidth; // Use dimensions directly
+                 if(elements.outputWidthInput) elements.outputWidthInput.value = img.naturalWidth;
                  if(elements.outputHeightInput) elements.outputHeightInput.value = img.naturalHeight;
                  if(elements.sourcePreview) {
-                     elements.sourcePreview.src = e.target.result; // Use data URL for preview
+                     elements.sourcePreview.src = e.target.result;
                      elements.sourcePreview.classList.remove('hidden');
                  }
                  if(elements.sourcePreviewText) elements.sourcePreviewText.classList.add('hidden');
@@ -498,32 +546,23 @@ function handleImageLoad(event) {
                  if(elements.sourceZoomValueSpan) elements.sourceZoomValueSpan.textContent = '1.0';
 
                  requestAnimationFrame(() => {
-                    console.log(" handleImageLoad: requestAnimationFrame - START");
-                    if (!sourceEffectCtx) { /* ... error handling ... */ resetApp(); return; }
+                    if (!sourceEffectCtx) { resetApp(); return; }
 
-                    // Update visual transform for the source preview image using new state
-                    const { clampedX, clampedY } = updateSourcePreviewTransform(elements, stateManager.getState()); // Pass state snapshot
-                    stateManager.setCurrentOffsets(clampedX, clampedY); // Update state with clamped values
+                    const { clampedX, clampedY } = updateSourcePreviewTransform(elements, stateManager.getState());
+                    stateManager.setCurrentOffsets(clampedX, clampedY);
 
-                    // Initialize sourceEffectCanvas size using stateManager
                     const {width: initialWidth, height: initialHeight} = stateManager.getOriginalDimensions();
                     elements.sourceEffectCanvas.width = initialWidth;
                     elements.sourceEffectCanvas.height = initialHeight;
 
-                    console.log(" handleImageLoad: requestAnimationFrame - Calling initial redrawSourceCanvasWithEffect...");
-                    if (redrawSourceCanvasWithEffect()) { // Uses stateManager internally
-                        console.log(" handleImageLoad: requestAnimationFrame - Initial redraw SUCCESS.");
+                    if (redrawSourceCanvasWithEffect()) {
                         try {
-                             // Push the initial state (drawn by redrawSourceCanvasWithEffect) to history
                              const initialImageData = sourceEffectCtx.getImageData(0, 0, initialWidth, initialHeight);
-                             stateManager.pushHistoryState(initialImageData); // Add base state to history
-                             updateHistoryButtonsUI(); // Update buttons
-                             console.log("  -> History initialized with base state.");
-                        } catch(histError) { /* ... error handling ... */ resetApp(); return; }
-                    } else { /* ... error handling ... */ resetApp(); return; }
+                             stateManager.pushHistoryState(initialImageData);
+                             updateHistoryButtonsUI();
+                        } catch(histError) { console.error(" History init error:", histError); resetApp(); return; }
+                    } else { console.error(" Initial redraw FAILED."); resetApp(); return; }
 
-                    console.log(" handleImageLoad: requestAnimationFrame - Enabling UI controls...");
-                    // Enable controls (UI part)
                     if(elements.saveButton) elements.saveButton.disabled = false;
                     if(elements.applyEffectButton) elements.applyEffectButton.disabled = false;
                     elements.tileShapeOptions?.forEach(opt => opt.disabled = false);
@@ -534,24 +573,24 @@ function handleImageLoad(event) {
                     if(elements.outputHeightInput) elements.outputHeightInput.disabled = false;
                     if(elements.keepAspectRatioCheckbox) elements.keepAspectRatioCheckbox.disabled = false;
 
-                    console.log(" handleImageLoad: requestAnimationFrame - Updating control visibility...");
                     updateTilingControlsVisibility(elements, handleSliderChange);
                     updatePreEffectControlsVisibility(elements);
-                    console.log(" handleImageLoad: requestAnimationFrame - Requesting initial full update...");
                     requestFullUpdate();
                     showMessage('Image loaded. Adjust effect/tiling controls.', false, elements.messageBox);
-                    console.log(" handleImageLoad: requestAnimationFrame - END");
                 });
-                console.log(" handleImageLoad: img.onload - END");
             };
-            img.onerror = () => { /* ... error handling ... */ resetApp(); };
+            img.onerror = () => { resetApp(); };
             img.src = e.target.result;
         };
-        reader.onerror = () => { /* ... error handling ... */ resetApp(); };
+        reader.onerror = () => { resetApp(); };
         reader.readAsDataURL(file);
 
-    } catch (error) { /* ... error handling ... */ }
-    console.log("[MainApp] handleImageLoad - END");
+    } catch (error) {
+        console.error("[MainApp] UNEXPECTED ERROR in handleImageLoad:", error);
+        showMessage("A critical error occurred during image loading. Please check console.", true, elements.messageBox);
+         try { resetApp(); } catch (resetError) { /* ignore */ }
+    }
+    // console.log("[MainApp] handleImageLoad - END");
 }
 
 
@@ -559,210 +598,15 @@ function handleImageLoad(event) {
  * Handles saving the final processed image. Uses stateManager.
  */
 function saveImage() {
-    console.log("[MainApp] saveImage called.");
-    // Use state manager for checks
+    // console.log("[MainApp] saveImage called.");
      if (!elements.canvas || (!stateManager.getCurrentImage() && stateManager.getHistoryInfo().length === 0)) {
-        console.warn(" saveImage: Save cancelled: Canvas not ready or no image/history.");
-        showMessage("Cannot save: No image processed yet.", true, elements.messageBox);
-        return;
+        showMessage("Cannot save: No image processed yet.", true, elements.messageBox); return;
     }
-     if (stateManager.isProcessing()) { /* ... error handling ... */ return; }
+     if (stateManager.isProcessing()) { showMessage("Cannot save while processing.", true, elements.messageBox); return; }
 
     try {
         const finalCanvas = elements.canvas;
         const outputWidth = parseInt(elements.outputWidthInput?.value, 10) || finalCanvas.width;
         const outputHeight = parseInt(elements.outputHeightInput?.value, 10) || finalCanvas.height;
 
-        if (isNaN(outputWidth) || isNaN(outputHeight) || outputWidth <= 0 || outputHeight <= 0) { /* ... error handling ... */ return; }
-
-        let canvasToSave = finalCanvas;
-        if (outputWidth !== finalCanvas.width || outputHeight !== finalCanvas.height) {
-            // ... (resizing logic remains the same) ...
-        }
-
-        const dataURL = canvasToSave.toDataURL('image/png');
-        const link = document.createElement('a');
-        // Use state manager for filename
-        const baseName = stateManager.getOriginalFileName().replace(/\.[^/.]+$/, "");
-        link.download = `${baseName}_MeltMixPix.png`;
-        link.href = dataURL;
-        link.click();
-        showMessage("Image saved successfully!", false, elements.messageBox);
-
-    } catch (error) { /* ... error handling ... */ }
-}
-
-// --- Event Listeners Setup ---
-// Needs modification to pass stateManager or use its functions in handlers like startPan, panMove, handleDimensionChange, handleSourceZoom
-function setupEventListeners() {
-     console.log("[MainApp] setupEventListeners - START");
-    if (!elements.imageLoader) { /* ... error handling ... */ return; }
-
-    // Image Load / Save / History
-    elements.imageLoader.addEventListener('change', handleImageLoad); // Handler uses stateManager internally now
-    elements.saveButton?.addEventListener('click', saveImage); // Handler uses stateManager internally now
-    elements.applyEffectButton?.addEventListener('click', handleApplyEffectClick); // Handler uses stateManager internally now
-    elements.undoButton?.addEventListener('click', handleUndoClick); // Handler uses stateManager internally now
-    elements.redoButton?.addEventListener('click', handleRedoClick); // Handler uses stateManager internally now
-
-    // Options change
-    elements.tileShapeOptions?.forEach(opt => opt.addEventListener('change', handleOptionChange));
-    elements.mirrorOptions?.forEach(opt => opt.addEventListener('change', handleOptionChange));
-    const effectSelects = [ /* ... */ ]; // As before
-    effectSelects.forEach(select => { if(select) select.addEventListener('change', handleOptionChange); });
-    elements.preEffectSelector?.addEventListener('change', handleOptionChange);
-
-    // Sliders
-    const tilingSliders = [ /* ... */ ]; // As before
-    tilingSliders.forEach(slider => { if(slider) slider.addEventListener('input', handleSliderChange); }); // handleSliderChange calls requestFullUpdate which uses stateManager
-    setupSliderListener(elements.preEffectIntensitySlider, elements.preEffectIntensityValue, requestFullUpdate);
-    setupSliderListener(elements.preEffectWaveAmplitudeSlider, elements.preEffectWaveAmplitudeValue, requestFullUpdate);
-    setupSliderListener(elements.preEffectWaveFrequencySlider, elements.preEffectWaveFrequencyValue, requestFullUpdate);
-    setupSliderListener(elements.preEffectWavePhaseSlider, elements.preEffectWavePhaseValue, requestFullUpdate, val => val + '°');
-    setupSliderListener(elements.sliceShiftIntensitySlider, elements.sliceShiftIntensityValue, requestFullUpdate);
-    setupSliderListener(elements.pixelSortThresholdSlider, elements.pixelSortThresholdValue, requestFullUpdate);
-
-
-    // Source Zoom - Modify callback to use stateManager
-    if (elements.sourceZoomSlider) {
-         setupSliderListener(
-             elements.sourceZoomSlider, elements.sourceZoomValueSpan,
-             () => { // Callback function
-                 console.log(' setupEventListeners: Zoom slider callback.');
-                 // Update state via stateManager
-                 stateManager.setZoomLevel(parseFloat(elements.sourceZoomSlider.value));
-                 // Update UI preview transform (needs state)
-                 const { clampedX, clampedY } = updateSourcePreviewTransform(elements, stateManager.getState());
-                 stateManager.setCurrentOffsets(clampedX, clampedY); // Update state with clamped values
-                 // Request final preview update
-                 requestFullUpdate();
-             },
-             val => parseFloat(val).toFixed(1) // Formatter for display
-         );
-    }
-
-    // Output Dimensions - Modify handler to use stateManager if needed
-    // handleDimensionChange needs stateManager.getOriginalAspectRatio()
-    const dimensionChangeHandler = (e) => {
-        const changedInput = e.target;
-        if (!stateManager.getCurrentImage() || !elements.keepAspectRatioCheckbox?.checked) return;
-
-        const newValue = parseInt(changedInput.value, 10);
-        if (isNaN(newValue) || newValue <= 0) return;
-
-        const aspectRatio = stateManager.getOriginalAspectRatio();
-        if (!aspectRatio) return;
-
-        if (changedInput === elements.outputWidthInput && elements.outputHeightInput) {
-            elements.outputHeightInput.value = Math.round(newValue / aspectRatio);
-        } else if (changedInput === elements.outputHeightInput && elements.outputWidthInput) {
-            elements.outputWidthInput.value = Math.round(newValue * aspectRatio);
-        }
-    };
-    elements.outputWidthInput?.addEventListener('input', dimensionChangeHandler);
-    elements.outputHeightInput?.addEventListener('input', dimensionChangeHandler);
-    elements.keepAspectRatioCheckbox?.addEventListener('change', () => {
-        if (elements.keepAspectRatioCheckbox?.checked && stateManager.getCurrentImage() && elements.outputWidthInput) {
-             dimensionChangeHandler({ target: elements.outputWidthInput });
-        }
-    });
-
-
-    // Panning Listeners - Modify handlers to use stateManager
-    if (elements.sourcePreviewContainer) {
-         elements.sourcePreviewContainer.addEventListener('mousedown', (e) => {
-             if (!stateManager.getCurrentImage() || e.button !== 0) return;
-             if (e.target === elements?.sourcePreview) { e.preventDefault(); }
-             stateManager.setDragging(true, e.pageX, e.pageY); // Use manager to set start state
-             if(elements?.sourcePreviewContainer) { elements.sourcePreviewContainer.style.cursor = 'grabbing'; }
-         });
-
-         document.addEventListener('mousemove', (e) => {
-             if (!stateManager.isDragging()) return; // Use manager to check dragging state
-             const panState = stateManager.getPanState();
-             const dx = e.pageX - panState.dragStartX;
-             const dy = e.pageY - panState.dragStartY;
-             const newOffsetX = panState.startOffsetX + dx;
-             const newOffsetY = panState.startOffsetY + dy;
-             stateManager.updatePanOffsets(newOffsetX, newOffsetY); // Update state via manager
-
-             // Update UI preview transform (needs current state)
-             const { clampedX, clampedY } = updateSourcePreviewTransform(elements, stateManager.getState());
-             // Update state again with clamped values IF they differ
-             if (newOffsetX !== clampedX || newOffsetY !== clampedY) {
-                 stateManager.setCurrentOffsets(clampedX, clampedY);
-             }
-         });
-
-         const endPanHandler = () => {
-             if (stateManager.isDragging()) { // Use manager
-                 console.log(' setupEventListeners: Pan ended via endPanHandler.');
-                 stateManager.setDragging(false); // Use manager to stop dragging
-                 if(elements?.sourcePreviewContainer) { elements.sourcePreviewContainer.style.cursor = 'grab'; }
-                 requestFullUpdate(); // Trigger final update
-             }
-         };
-         document.addEventListener('mouseup', endPanHandler);
-         document.addEventListener('mouseleave', endPanHandler);
-     } else {
-        console.warn(" setupEventListeners: Could not attach panning listeners: sourcePreviewContainer not found.");
-     }
-     console.log("[MainApp] setupEventListeners - END");
-}
-
-
-// --- Initial Application State Setup ---
-function initializeApp() {
-     console.log("[MainApp] initializeApp - START");
-
-     // --- Populate the 'elements' object ---
-     // (Same as before)
-      elements = { /* ... all element assignments ... */ };
-      console.log(" initializeApp: Elements object populated.");
-
-      // Populate grouped sliders/selects arrays
-     elements.sliders = [ /* ... */ ].filter(el => el !== null);
-     elements.selects = [ /* ... */ ].filter(el => el !== null);
-    //  console.log(` initializeApp: Grouped ${elements.sliders.length} sliders and ${elements.selects.length} selects.`);
-
-
-     // --- Get initial context (needed before state reset potentially) ---
-     // Store context locally in main.js, not in stateManager
-     sourceEffectCtx = elements.sourceEffectCanvas?.getContext('2d', { willReadFrequently: true });
-     if (!sourceEffectCtx) {
-         console.error(" initializeApp: CRITICAL - Failed to get context for sourceEffectCanvas! Cannot proceed.");
-         if (elements.messageBox) showMessage("Initialization Error: Cannot get canvas context. Please refresh.", true, elements.messageBox);
-         return;
-     }
-     console.log(" initializeApp: sourceEffectCtx obtained.");
-
-
-     // --- Call resetStateData and resetUIState ---
-     stateManager.resetStateData(); // Reset the managed state
-     console.log(" initializeApp: stateManager data reset.");
-
-     // Reset the UI elements (passing necessary callbacks)
-      resetUIState(elements, {}, // Pass empty object for state, no longer directly needed by resetUIState
-         () => updateTilingControlsVisibility(elements, handleSliderChange),
-         () => updatePreEffectControlsVisibility(elements),
-         handleSliderChange,
-         () => {
-             // History clearing is handled by stateManager.resetStateData, but update buttons here
-             updateHistoryButtonsUI();
-         }
-     );
-     console.log(" initializeApp: UI reset complete.");
-
-
-     // --- Setup Event Listeners ---
-     setupEventListeners(); // Uses stateManager internally now
-
-     // --- Final Initial UI State ---
-     updateHistoryButtonsUI(); // Ensure buttons reflect initial empty history
-     console.log(" initializeApp: Image Tiler Initialized and ready.");
-     showMessage("Load an image to begin.", false, elements.messageBox);
-     console.log("[MainApp] initializeApp - END");
-}
-
-// --- Start the application ---
-document.addEventListener('DOMContentLoaded', initializeApp);
+        if (isNaN(outputWidth) || isNaN(outputHeight) ||
