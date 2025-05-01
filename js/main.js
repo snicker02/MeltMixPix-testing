@@ -161,7 +161,7 @@ function requestFullUpdate() {
     const check2 = !elements.sourceEffectCanvas;
     const check3 = !sourceEffectCtx; // Use local context variable
     const isProcessing = stateManager.isProcessing();
-    // console.log(` requestFullUpdate PRE-CHECKS: NoImage&History=<span class="math-inline">\{check1\}, NoCanvas\=</span>{check2}, NoCtx=<span class="math-inline">\{check3\}, IsProcessing\=</span>{isProcessing}`);
+    // console.log(` requestFullUpdate PRE-CHECKS: NoImage&History=${check1}, NoCanvas=${check2}, NoCtx=${check3}, IsProcessing=${isProcessing}`);
 
 
     if (check1 || check2 || check3) {
@@ -190,7 +190,7 @@ function requestFullUpdate() {
         const inCheck2 = !elements.sourceEffectCanvas;
         const inCheck3 = !sourceEffectCtx;
         const inIsProcessing = stateManager.isProcessing(); // Re-check processing status
-        // console.log(` requestFullUpdate INSIDE TIMEOUT PRE-CHECKS: NoImage&History=<span class="math-inline">\{inCheck1\}, NoCanvas\=</span>{inCheck2}, NoCtx=<span class="math-inline">\{inCheck3\}, IsProcessing\=</span>{inIsProcessing}`);
+        // console.log(` requestFullUpdate INSIDE TIMEOUT PRE-CHECKS: NoImage&History=${inCheck1}, NoCanvas=${inCheck2}, NoCtx=${inCheck3}, IsProcessing=${inIsProcessing}`);
 
 
         if (inCheck1 || inIsProcessing || inCheck2 || inCheck3) {
@@ -219,7 +219,7 @@ function requestFullUpdate() {
         if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
            canvas.width = targetWidth;
            canvas.height = targetHeight;
-        //    console.log(` requestFullUpdate: Set sourceEffectCanvas size to <span class="math-inline">\{canvas\.width\}x</span>{canvas.height}`);
+        //    console.log(` requestFullUpdate: Set sourceEffectCanvas size to ${canvas.width}x${canvas.height}`);
         }
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -609,4 +609,259 @@ function saveImage() {
         const outputWidth = parseInt(elements.outputWidthInput?.value, 10) || finalCanvas.width;
         const outputHeight = parseInt(elements.outputHeightInput?.value, 10) || finalCanvas.height;
 
-        if (isNaN(outputWidth) || isNaN(outputHeight) ||
+        if (isNaN(outputWidth) || isNaN(outputHeight) || outputWidth <= 0 || outputHeight <= 0) { throw new Error("Invalid output dimensions."); }
+
+        let canvasToSave = finalCanvas;
+        if (outputWidth !== finalCanvas.width || outputHeight !== finalCanvas.height) {
+            const tempSaveCanvas = document.createElement('canvas'); tempSaveCanvas.width = outputWidth; tempSaveCanvas.height = outputHeight;
+            const tempCtx = tempSaveCanvas.getContext('2d');
+            if (!tempCtx) throw new Error("Could not create temporary context for saving.");
+            tempCtx.imageSmoothingEnabled = true; tempCtx.imageSmoothingQuality = 'high';
+            tempCtx.drawImage(finalCanvas, 0, 0, finalCanvas.width, finalCanvas.height, 0, 0, outputWidth, outputHeight);
+            canvasToSave = tempSaveCanvas;
+        }
+
+        const dataURL = canvasToSave.toDataURL('image/png');
+        const link = document.createElement('a');
+        const baseName = stateManager.getOriginalFileName().replace(/\.[^/.]+$/, "");
+        link.download = `${baseName}_MeltMixPix.png`;
+        link.href = dataURL; link.click();
+        showMessage("Image saved successfully!", false, elements.messageBox);
+
+    } catch (error) { showMessage(`Error saving image: ${error.message || 'Unknown error'}.`, true, elements.messageBox); }
+}
+
+// --- Event Listeners Setup ---
+function setupEventListeners() {
+     console.log("[MainApp] setupEventListeners - START");
+    if (!elements.imageLoader) { return; }
+
+    console.log(" setupEventListeners: Attaching 'change' listener to elements.imageLoader:", elements.imageLoader);
+    elements.imageLoader.addEventListener('change', handleImageLoad);
+    console.log(" setupEventListeners: 'change' listener attached to imageLoader.");
+
+
+    elements.saveButton?.addEventListener('click', saveImage);
+    elements.applyEffectButton?.addEventListener('click', handleApplyEffectClick);
+    elements.undoButton?.addEventListener('click', handleUndoClick);
+    elements.redoButton?.addEventListener('click', handleRedoClick);
+
+    elements.tileShapeOptions?.forEach(opt => opt.addEventListener('change', handleOptionChange));
+    elements.mirrorOptions?.forEach(opt => opt.addEventListener('change', handleOptionChange));
+
+    const tilingSliders = [
+        elements.tilesXSlider, elements.tilesYSlider, elements.skewSlider,
+        elements.staggerSlider, elements.scaleSlider, elements.preTileXSlider, elements.preTileYSlider
+    ];
+    tilingSliders.forEach(slider => { if(slider) slider.addEventListener('input', handleSliderChange); });
+
+    elements.preEffectSelector?.addEventListener('change', handleOptionChange);
+
+    setupSliderListener(elements.preEffectIntensitySlider, elements.preEffectIntensityValue, requestFullUpdate);
+    setupSliderListener(elements.preEffectWaveAmplitudeSlider, elements.preEffectWaveAmplitudeValue, requestFullUpdate);
+    setupSliderListener(elements.preEffectWaveFrequencySlider, elements.preEffectWaveFrequencyValue, requestFullUpdate);
+    setupSliderListener(elements.preEffectWavePhaseSlider, elements.preEffectWavePhaseValue, requestFullUpdate, val => val + '°');
+    setupSliderListener(elements.sliceShiftIntensitySlider, elements.sliceShiftIntensityValue, requestFullUpdate);
+    setupSliderListener(elements.pixelSortThresholdSlider, elements.pixelSortThresholdValue, requestFullUpdate);
+
+    const effectSelects = [
+        elements.preEffectWaveDirection, elements.preEffectWaveType,
+        elements.sliceShiftDirection, elements.pixelSortDirection, elements.pixelSortBy
+    ];
+    effectSelects.forEach(select => { if(select) select.addEventListener('change', handleOptionChange); });
+
+    // Source Zoom - uses stateManager
+    if (elements.sourceZoomSlider) {
+         setupSliderListener(
+             elements.sourceZoomSlider, elements.sourceZoomValueSpan,
+             () => {
+                 stateManager.setZoomLevel(parseFloat(elements.sourceZoomSlider.value));
+                 const { clampedX, clampedY } = updateSourcePreviewTransform(elements, stateManager.getState());
+                 stateManager.setCurrentOffsets(clampedX, clampedY);
+                 requestFullUpdate();
+             },
+             val => parseFloat(val).toFixed(1)
+         );
+    }
+
+    // Output Dimensions - uses stateManager
+    const dimensionChangeHandler = (e) => {
+        const changedInput = e.target;
+        if (!stateManager.getCurrentImage() || !elements.keepAspectRatioCheckbox?.checked) return;
+        const newValue = parseInt(changedInput.value, 10);
+        if (isNaN(newValue) || newValue <= 0) return;
+        const aspectRatio = stateManager.getOriginalAspectRatio();
+        if (!aspectRatio) return;
+        if (changedInput === elements.outputWidthInput && elements.outputHeightInput) {
+            elements.outputHeightInput.value = Math.round(newValue / aspectRatio);
+        } else if (changedInput === elements.outputHeightInput && elements.outputWidthInput) {
+            elements.outputWidthInput.value = Math.round(newValue * aspectRatio);
+        }
+    };
+    elements.outputWidthInput?.addEventListener('input', dimensionChangeHandler);
+    elements.outputHeightInput?.addEventListener('input', dimensionChangeHandler);
+    elements.keepAspectRatioCheckbox?.addEventListener('change', () => {
+        if (elements.keepAspectRatioCheckbox?.checked && stateManager.getCurrentImage() && elements.outputWidthInput) {
+             dimensionChangeHandler({ target: elements.outputWidthInput });
+        }
+    });
+
+    // Panning Listeners - uses stateManager
+    if (elements.sourcePreviewContainer) {
+         elements.sourcePreviewContainer.addEventListener('mousedown', (e) => {
+             if (!stateManager.getCurrentImage() || e.button !== 0) return;
+             if (e.target === elements?.sourcePreview) { e.preventDefault(); }
+             stateManager.setDragging(true, e.pageX, e.pageY);
+             if(elements?.sourcePreviewContainer) { elements.sourcePreviewContainer.style.cursor = 'grabbing'; }
+         });
+         document.addEventListener('mousemove', (e) => {
+             if (!stateManager.isDragging()) return;
+             const panState = stateManager.getPanState();
+             const dx = e.pageX - panState.dragStartX;
+             const dy = e.pageY - panState.dragStartY;
+             const newOffsetX = panState.startOffsetX + dx;
+             const newOffsetY = panState.startOffsetY + dy;
+             stateManager.updatePanOffsets(newOffsetX, newOffsetY);
+             const { clampedX, clampedY } = updateSourcePreviewTransform(elements, stateManager.getState());
+             if (newOffsetX !== clampedX || newOffsetY !== clampedY) {
+                 stateManager.setCurrentOffsets(clampedX, clampedY);
+             }
+         });
+         const endPanHandler = () => {
+             if (stateManager.isDragging()) {
+                 stateManager.setDragging(false);
+                 if(elements?.sourcePreviewContainer) { elements.sourcePreviewContainer.style.cursor = 'grab'; }
+                 requestFullUpdate();
+             }
+         };
+         document.addEventListener('mouseup', endPanHandler);
+         document.addEventListener('mouseleave', endPanHandler);
+     }
+     console.log("[MainApp] setupEventListeners - END");
+}
+
+
+// --- Initial Application State Setup ---
+function initializeApp() {
+     console.log("[MainApp] initializeApp - START");
+
+     // --- Populate the 'elements' object ---
+      elements = {
+         imageLoader: document.getElementById('imageLoader'),
+         saveButton: document.getElementById('saveButton'),
+         messageBox: document.getElementById('messageBox'),
+         outputWidthInput: document.getElementById('outputWidth'),
+         outputHeightInput: document.getElementById('outputHeight'),
+         keepAspectRatioCheckbox: document.getElementById('keepAspectRatio'),
+         sourcePreviewContainer: document.getElementById('sourcePreviewContainer'),
+         sourcePreview: document.getElementById('sourcePreview'),
+         sourcePreviewText: document.getElementById('sourcePreviewText'),
+         finalPreviewContainer: document.getElementById('finalPreviewContainer'),
+         finalPreview: document.getElementById('finalPreview'),
+         finalPreviewText: document.getElementById('finalPreviewText'),
+         mirrorCanvas: document.getElementById('mirrorCanvas'),
+         preTileCanvas: document.getElementById('preTileCanvas'),
+         canvas: document.getElementById('imageCanvas'),
+         sourceEffectCanvas: document.getElementById('sourceEffectCanvas'),
+         applyEffectButton: document.getElementById('applyEffectButton'),
+         undoButton: document.getElementById('undoButton'),
+         redoButton: document.getElementById('redoButton'),
+         sourceZoomSlider: document.getElementById('sourceZoom'),
+         sourceZoomValueSpan: document.getElementById('sourceZoomValue'),
+         tileShapeOptions: document.querySelectorAll('input[name="tileShape"]'),
+         mirrorOptions: document.querySelectorAll('input[name="mirrorOption"]'),
+         tilesXSlider: document.getElementById('tilesX'),
+         tilesYSlider: document.getElementById('tilesY'),
+         skewSlider: document.getElementById('skewFactor'),
+         staggerSlider: document.getElementById('staggerOffset'),
+         scaleSlider: document.getElementById('tileScale'),
+         preTileXSlider: document.getElementById('preTileX'),
+         preTileYSlider: document.getElementById('preTileY'),
+         tilesXValueSpan: document.getElementById('tilesXValue'),
+         tilesYValueSpan: document.getElementById('tilesYValue'),
+         skewValueSpan: document.getElementById('skewValue'),
+         staggerValueSpan: document.getElementById('staggerValue'),
+         scaleValueSpan: document.getElementById('scaleValue'),
+         preTileXValueSpan: document.getElementById('preTileXValue'),
+         preTileYValueSpan: document.getElementById('preTileYValue'),
+         skewControl: document.getElementById('skewControl'),
+         staggerControl: document.getElementById('staggerControl'),
+         tilesXLabel: document.getElementById('tilesXLabel'),
+         tilesYLabel: document.getElementById('tilesYLabel'),
+         scaleLabel: document.getElementById('scaleLabel'),
+         tilesXYHelpText: document.getElementById('tilesXYHelpText'),
+         preEffectSelector: document.getElementById('preEffectSelector'),
+         preEffectOptionsContainer: document.getElementById('preEffectOptionsContainer'),
+         preEffectIntensityControl: document.getElementById('preEffectIntensityControl'),
+         preEffectIntensitySlider: document.getElementById('preEffectIntensitySlider'),
+         preEffectIntensityValue: document.getElementById('preEffectIntensityValue'),
+         preEffectRealtimeWarning: document.getElementById('preEffectRealtimeWarning'),
+         preEffectWaveDistortionOptions: document.getElementById('preEffectWaveDistortionOptions'),
+         preEffectWaveAmplitudeSlider: document.getElementById('preEffectWaveAmplitudeSlider'),
+         preEffectWaveAmplitudeValue: document.getElementById('preEffectWaveAmplitudeValue'),
+         preEffectWaveFrequencySlider: document.getElementById('preEffectWaveFrequencySlider'),
+         preEffectWaveFrequencyValue: document.getElementById('preEffectWaveFrequencyValue'),
+         preEffectWavePhaseSlider: document.getElementById('preEffectWavePhaseSlider'),
+         preEffectWavePhaseValue: document.getElementById('preEffectWavePhaseValue'),
+         preEffectWaveDirection: document.getElementById('preEffectWaveDirection'),
+         preEffectWaveType: document.getElementById('preEffectWaveType'),
+         sliceShiftOptions: document.getElementById('sliceShiftOptions'),
+         sliceShiftDirection: document.getElementById('sliceShiftDirection'),
+         sliceShiftIntensitySlider: document.getElementById('sliceShiftIntensitySlider'),
+         sliceShiftIntensityValue: document.getElementById('sliceShiftIntensityValue'),
+         pixelSortOptions: document.getElementById('pixelSortOptions'),
+         pixelSortThresholdSlider: document.getElementById('pixelSortThresholdSlider'),
+         pixelSortThresholdValue: document.getElementById('pixelSortThresholdValue'),
+         pixelSortDirection: document.getElementById('pixelSortDirection'),
+         pixelSortBy: document.getElementById('pixelSortBy'),
+         sliders: [],
+         selects: []
+     };
+    //   console.log(" initializeApp: Elements object populated.");
+
+      elements.sliders = [
+         elements.tilesXSlider, elements.tilesYSlider, elements.skewSlider, elements.staggerSlider,
+         elements.scaleSlider, elements.preTileXSlider, elements.preTileYSlider, elements.sourceZoomSlider,
+         elements.preEffectIntensitySlider, elements.preEffectWaveAmplitudeSlider,
+         elements.preEffectWaveFrequencySlider, elements.preEffectWavePhaseSlider,
+         elements.sliceShiftIntensitySlider, elements.pixelSortThresholdSlider
+     ].filter(el => el !== null);
+
+     elements.selects = [
+        elements.preEffectSelector, elements.preEffectWaveDirection, elements.preEffectWaveType,
+        elements.sliceShiftDirection, elements.pixelSortDirection, elements.pixelSortBy
+     ].filter(el => el !== null);
+    //  console.log(` initializeApp: Grouped ${elements.sliders.length} sliders and ${elements.selects.length} selects.`);
+
+     // --- Get initial context ---
+     sourceEffectCtx = elements.sourceEffectCanvas?.getContext('2d', { willReadFrequently: true });
+     if (!sourceEffectCtx) {
+         console.error(" initializeApp: CRITICAL - Failed to get context for sourceEffectCanvas! Cannot proceed.");
+         if (elements.messageBox) showMessage("Initialization Error: Cannot get canvas context. Please refresh.", true, elements.messageBox);
+         return;
+     }
+    //  console.log(" initializeApp: sourceEffectCtx obtained.");
+
+     // --- Reset State and UI ---
+     stateManager.resetStateData();
+    //  console.log(" initializeApp: stateManager data reset.");
+     resetUIState(elements,
+         () => updateTilingControlsVisibility(elements, handleSliderChange),
+         () => updatePreEffectControlsVisibility(elements),
+         handleSliderChange,
+         updateHistoryButtonsUI // Pass button update function directly
+     );
+    //  console.log(" initializeApp: UI reset complete.");
+
+     // --- Setup Event Listeners ---
+     setupEventListeners(); // Uses stateManager internally now
+
+     // --- Final Initial UI State ---
+     updateHistoryButtonsUI();
+    //  console.log(" initializeApp: Image Tiler Initialized and ready.");
+     showMessage("Load an image to begin.", false, elements.messageBox);
+     console.log("[MainApp] initializeApp - END");
+}
+
+// --- Start the application ---
+document.addEventListener('DOMContentLoaded', initializeApp);
