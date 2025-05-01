@@ -1,11 +1,11 @@
-// js/main.js (Refactored to use stateManager.js - Corrected uiUtils import v2)
+// js/main.js (Refactored to use stateManager.js - Added canvas logging)
 
 // --- Utility Imports ---
 import {
     showMessage, updateTilingControlsVisibility, updatePreEffectControlsVisibility,
     updateSourcePreviewTransform, handleDimensionChange, resetUIState, // <<< CORRECTED IMPORT NAME
-    startPan, panMove, endPan, handleSourceZoom, setupSliderListener
- } from './utils/uiUtils.js';
+    startPan, panMove, endPan, handleSourceZoom, setupSliderListener, updateUndoRedoButtons
+ } from './utils/uiUtils.js'; // Added updateUndoRedoButtons here
 import { processAndPreviewImage } from './tiling/core.js';
 // historyUtils import removed
 
@@ -150,10 +150,10 @@ function redrawSourceCanvasWithEffect() {
 
 /**
  * Requests a full update of the final preview canvas. (Includes Pan/Zoom Fix)
- * Uses stateManager for checks and data retrieval.
+ * Uses stateManager for checks and data retrieval. Adds canvas logging.
  */
 function requestFullUpdate() {
-    // console.log('[MainApp] requestFullUpdate called.');
+    // console.log('[MainApp] requestFullUpdate called.'); // LOG POINT 1
 
     // Use state manager for checks
     const historyInfo = stateManager.getHistoryInfo();
@@ -166,7 +166,7 @@ function requestFullUpdate() {
 
     if (check1 || check2 || check3) {
         // console.warn(" requestFullUpdate skipped (OUTSIDE setTimeout): Prerequisites failed.");
-        return;
+        return; // Exit if basic elements/state aren't ready
     }
     if (isProcessing) {
         // console.warn(" requestFullUpdate skipped (OUTSIDE setTimeout): Already processing.");
@@ -182,7 +182,7 @@ function requestFullUpdate() {
     }
 
     debounceTimer = setTimeout(async () => {
-        // console.log('[MainApp] Debounce timer finished. Initiating full update.');
+        // console.log('[MainApp] Debounce timer finished. Initiating full update.'); // LOG POINT 2
 
         // Re-check prerequisites using state manager inside timeout
         const inHistoryInfo = stateManager.getHistoryInfo();
@@ -196,7 +196,7 @@ function requestFullUpdate() {
         if (inCheck1 || inIsProcessing || inCheck2 || inCheck3) {
             // console.warn(" requestFullUpdate: Full update skipped inside timeout: Prerequisites failed or already processing.");
             /* ... logging reasons ... */
-            return;
+            return; // Exit if prerequisites fail *inside* the timeout
         }
 
         // console.log(' requestFullUpdate: Prerequisites met for full update processing.');
@@ -265,6 +265,16 @@ function requestFullUpdate() {
                     sourceRectX, sourceRectY, sourceRectWidth, sourceRectHeight,
                     0, 0, canvas.width, canvas.height
                 );
+                // console.log(' requestFullUpdate: Drew panned/zoomed subsection onto sourceEffectCanvas.');
+
+                // <<< ADDED LOGGING HERE: Check canvas content BEFORE tiling >>>
+                try {
+                     console.log(' requestFullUpdate: sourceEffectCanvas content BEFORE tiling (Data URL potentially long):', canvas.toDataURL().substring(0, 100) + '...');
+                } catch (e) {
+                    console.error(" requestFullUpdate: Error getting dataURL from sourceEffectCanvas before tiling:", e);
+                }
+                // <<< END LOGGING >>>
+
             } else {
                  console.warn(' requestFullUpdate: Skipping drawImage - calculated source dimensions are invalid (<= 0).');
                  showMessage("Error: Invalid zoom or source dimensions.", true, elements.messageBox);
@@ -301,8 +311,8 @@ function requestFullUpdate() {
  */
 function updateHistoryButtonsUI() {
     const historyInfo = stateManager.getHistoryInfo();
-    if (elements.undoButton) elements.undoButton.disabled = historyInfo.index <= 0;
-    if (elements.redoButton) elements.redoButton.disabled = historyInfo.index >= historyInfo.length - 1;
+    // Use the imported utility function
+    updateUndoRedoButtons(elements, historyInfo);
 }
 
 
@@ -312,7 +322,6 @@ function updateHistoryButtonsUI() {
  */
 function handleApplyEffectClick() {
     // console.log('[MainApp] handleApplyEffectClick - START');
-    // Use state manager for checks
     const historyInfo = stateManager.getHistoryInfo();
     if (!stateManager.getCurrentImage() && historyInfo.length === 0) {
         showMessage("Load an image first.", true, elements.messageBox); return;
@@ -329,17 +338,11 @@ function handleApplyEffectClick() {
     }
 
     try {
-        // console.log(" handleApplyEffectClick: Attempting to get ImageData after applying effect...");
         const imageDataToSave = sourceEffectCtx.getImageData(0, 0, elements.sourceEffectCanvas.width, elements.sourceEffectCanvas.height);
-        // console.log(" handleApplyEffectClick: Got ImageData. Attempting stateManager.pushHistoryState...");
-        stateManager.pushHistoryState(imageDataToSave); // Use state manager
-        updateHistoryButtonsUI(); // Update buttons after history changes
-        // console.log(" handleApplyEffectClick: pushHistoryState completed.");
+        stateManager.pushHistoryState(imageDataToSave);
+        updateHistoryButtonsUI();
         showMessage(`Effect "${effect || 'None'}" applied (stacked) and saved to history.`, false, elements.messageBox);
-
-        // console.log(" handleApplyEffectClick: Requesting full update after apply.");
         requestFullUpdate();
-
     } catch (e) { console.error(" handleApplyEffectClick: Error getting ImageData after applying effect or pushing history:", e); }
     // console.log('[MainApp] handleApplyEffectClick - END');
 }
@@ -353,7 +356,7 @@ function handleUndoClick() {
     const historyInfo = stateManager.getHistoryInfo();
     if (historyInfo.index <= 0) { return; }
 
-    const previousImageData = stateManager.undoState(); // Use state manager
+    const previousImageData = stateManager.undoState();
 
     if (previousImageData) {
          try {
@@ -362,9 +365,8 @@ function handleUndoClick() {
                  elements.sourceEffectCanvas.height = previousImageData.height;
              }
              sourceEffectCtx.putImageData(previousImageData, 0, 0);
-             updateHistoryButtonsUI(); // Update buttons
-            //  console.log(' handleUndoClick: Requesting full update after undo.');
-             requestFullUpdate(); // Update preview to reflect undone state
+             updateHistoryButtonsUI();
+             requestFullUpdate();
              showMessage("Undo successful.", false, elements.messageBox);
          } catch(e) { console.error(" handleUndoClick: Error putting undone state on canvas:", e); }
     }
@@ -380,7 +382,7 @@ function handleRedoClick() {
       const historyInfo = stateManager.getHistoryInfo();
      if (historyInfo.index >= historyInfo.length - 1) { return; }
 
-    const nextImageData = stateManager.redoState(); // Use state manager
+    const nextImageData = stateManager.redoState();
 
      if (nextImageData) {
          try {
@@ -389,9 +391,8 @@ function handleRedoClick() {
                  elements.sourceEffectCanvas.height = nextImageData.height;
              }
              sourceEffectCtx.putImageData(nextImageData, 0, 0);
-             updateHistoryButtonsUI(); // Update buttons
-            //  console.log(' handleRedoClick: Requesting full update after redo.');
-             requestFullUpdate(); // Update preview to reflect redone state
+             updateHistoryButtonsUI();
+             requestFullUpdate();
              showMessage("Redo successful.", false, elements.messageBox);
         } catch(e) { console.error(" handleRedoClick: Error putting redone state on canvas:", e); }
     }
@@ -504,13 +505,13 @@ function handleImageLoad(event) {
 
         const resetApp = () => {
             // console.log(" handleImageLoad: Calling resetApp (UI reset + state reset).");
-            resetUIState(elements,
+            resetUIState(elements, // Use renamed UI reset function
                 () => updateTilingControlsVisibility(elements, handleSliderChange),
                 () => updatePreEffectControlsVisibility(elements),
                 handleSliderChange,
-                updateHistoryButtonsUI
+                updateHistoryButtonsUI // Pass the specific button update function
             );
-            stateManager.resetStateData();
+            stateManager.resetStateData(); // Reset state data via stateManager
              if (elements.messageBox) showMessage("Ready to load a new image.", false, elements.messageBox);
              if(elements.imageLoader) elements.imageLoader.value = '';
         };
@@ -633,12 +634,12 @@ function saveImage() {
 
 // --- Event Listeners Setup ---
 function setupEventListeners() {
-     console.log("[MainApp] setupEventListeners - START");
+     // console.log("[MainApp] setupEventListeners - START");
     if (!elements.imageLoader) { return; }
 
-    console.log(" setupEventListeners: Attaching 'change' listener to elements.imageLoader:", elements.imageLoader);
+    // console.log(" setupEventListeners: Attaching 'change' listener to elements.imageLoader:", elements.imageLoader);
     elements.imageLoader.addEventListener('change', handleImageLoad);
-    console.log(" setupEventListeners: 'change' listener attached to imageLoader.");
+    // console.log(" setupEventListeners: 'change' listener attached to imageLoader.");
 
 
     elements.saveButton?.addEventListener('click', saveImage);
@@ -737,13 +738,13 @@ function setupEventListeners() {
          document.addEventListener('mouseup', endPanHandler);
          document.addEventListener('mouseleave', endPanHandler);
      }
-     console.log("[MainApp] setupEventListeners - END");
+     // console.log("[MainApp] setupEventListeners - END");
 }
 
 
 // --- Initial Application State Setup ---
 function initializeApp() {
-     console.log("[MainApp] initializeApp - START");
+     // console.log("[MainApp] initializeApp - START");
 
      // --- Populate the 'elements' object ---
       elements = {
@@ -860,7 +861,7 @@ function initializeApp() {
      updateHistoryButtonsUI();
     //  console.log(" initializeApp: Image Tiler Initialized and ready.");
      showMessage("Load an image to begin.", false, elements.messageBox);
-     console.log("[MainApp] initializeApp - END");
+    //  console.log("[MainApp] initializeApp - END");
 }
 
 // --- Start the application ---
