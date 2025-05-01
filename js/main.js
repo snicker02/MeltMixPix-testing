@@ -62,20 +62,22 @@ const generatorFunctions = {
  * @returns {boolean} True if successful, false otherwise.
  */
 function redrawSourceCanvasWithEffect() {
-    const currentState = stateManager.getState();
+    // console.log('[MainApp] redrawSourceCanvasWithEffect - START');
+    const currentState = stateManager.getState(); // Get snapshot
     const currentHistoryState = stateManager.getCurrentHistoryState();
-    const currentImage = currentState.currentImage;
+    const currentImage = currentState.currentImage; // Base loaded image (null if generated)
     const sourceWidth = currentState.originalWidth;
     const sourceHeight = currentState.originalHeight;
 
     if (!elements.sourceEffectCanvas || !sourceEffectCtx) {
-         console.error("redrawSourceCanvasWithEffect: Missing canvas or context.");
+         console.error(" redrawSourceCanvasWithEffect: Missing canvas or context.");
          return false;
     }
+    // We need *either* a history state *or* a loaded image to draw something
     if (!currentHistoryState && !currentImage) {
         // Don't log warning if canvas is intentionally blank before first load/generate
         if (elements.sourceEffectCanvas.width > 0 || elements.sourceEffectCanvas.height > 0) {
-             console.warn("redrawSourceCanvasWithEffect: No history state and no loaded image available to draw.");
+             console.warn(" redrawSourceCanvasWithEffect: No history state and no loaded image available to draw.");
              try {
                   sourceEffectCtx.clearRect(0, 0, elements.sourceEffectCanvas.width, elements.sourceEffectCanvas.height);
              } catch(e){}
@@ -83,7 +85,7 @@ function redrawSourceCanvasWithEffect() {
         return false; // Nothing to draw
     }
      if (!sourceWidth || !sourceHeight) {
-        console.error(`redrawSourceCanvasWithEffect: Invalid source dimensions (Width: ${sourceWidth}, Height: ${sourceHeight}).`);
+        console.error(` redrawSourceCanvasWithEffect: Invalid source dimensions (Width: ${sourceWidth}, Height: ${sourceHeight}).`);
         return false;
      }
 
@@ -670,7 +672,7 @@ function handleGeneratePatternClick() {
              if(elements.sourcePreviewContainer) elements.sourcePreviewContainer.style.cursor = 'grab';
              if(elements.sourceZoomSlider) elements.sourceZoomSlider.value = '1.0';
              if(elements.sourceZoomValueSpan) elements.sourceZoomValueSpan.textContent = '1.0';
-             if(elements.imageLoader) elements.imageLoader.disabled = false; // Re-enable image loader
+             if(elements.imageLoader) elements.imageLoader.disabled = false;
 
             // Push History & Enable Downstream
             stateManager.pushHistoryState(generatedImageData);
@@ -679,8 +681,8 @@ function handleGeneratePatternClick() {
             if(elements.sourceZoomSlider) elements.sourceZoomSlider.disabled = false;
             elements.tileShapeOptions?.forEach(opt => opt.disabled = false);
             elements.mirrorOptions?.forEach(opt => opt.disabled = false);
-            elements.sliders?.forEach(s => { if(s) s.disabled = false; }); // Enable ALL sliders (incl. generator)
-            elements.selects?.forEach(s => { if(s) s.disabled = false; }); // Enable ALL selects (incl. generator)
+            elements.sliders?.forEach(s => { if(s) s.disabled = false; }); // Enable ALL sliders
+            elements.selects?.forEach(s => { if(s) s.disabled = false; }); // Enable ALL selects
             if(elements.outputWidthInput) elements.outputWidthInput.disabled = false;
             if(elements.outputHeightInput) elements.outputHeightInput.disabled = false;
             if(elements.keepAspectRatioCheckbox) elements.keepAspectRatioCheckbox.disabled = false;
@@ -690,7 +692,7 @@ function handleGeneratePatternClick() {
             updateHistoryButtonsUI();
             updateTilingControlsVisibility(elements, handleSliderChange);
             updatePreEffectControlsVisibility(elements);
-            updateGeneratorControlsVisibility(elements);
+            updateGeneratorControlsVisibility(elements); // Ensure correct options shown
             requestFullUpdate();
             showMessage(`Generated ${generatorType} pattern.`, false, elements.messageBox);
 
@@ -774,7 +776,9 @@ function setupEventListeners() {
 
     // Option Radios/Selects
     elements.tileShapeOptions?.forEach(opt => opt.addEventListener('change', handleOptionChange));
-    elements.mirrorOptions?.forEach(opt => opt.addEventListener('change', handleOptionChange);
+    // <<< CORRECTED LINE >>>
+    elements.mirrorOptions?.forEach(opt => opt.addEventListener('change', handleOptionChange)); // Added missing parenthesis
+    // <<< END CORRECTION >>>
     elements.preEffectSelector?.addEventListener('change', handleOptionChange);
     const effectOptionSelects = [ elements.preEffectWaveDirection, elements.preEffectWaveType, elements.sliceShiftDirection, elements.pixelSortDirection, elements.pixelSortBy ];
     effectOptionSelects.forEach(select => { if(select) select.addEventListener('change', handleOptionChange); });
@@ -794,9 +798,8 @@ function setupEventListeners() {
     setupSliderListener(elements.sliceShiftIntensitySlider, elements.sliceShiftIntensityValue, requestFullUpdate);
     setupSliderListener(elements.pixelSortThresholdSlider, elements.pixelSortThresholdValue, requestFullUpdate);
     setupSliderListener(elements.perlinScale, elements.perlinScaleValue, handleSliderChange); // Update span only
-    // Add listeners for other generator controls like colors if needed for live preview later
-    elements.perlinColor1?.addEventListener('change', requestFullUpdate); // Example: Trigger update on color change
-    elements.perlinColor2?.addEventListener('change', requestFullUpdate); // Example: Trigger update on color change
+    elements.perlinColor1?.addEventListener('change', requestFullUpdate); // Trigger update on color change
+    elements.perlinColor2?.addEventListener('change', requestFullUpdate); // Trigger update on color change
 
     // Source Zoom
     if (elements.sourceZoomSlider) {
@@ -822,7 +825,7 @@ function setupEventListeners() {
     // Panning
     if (elements.sourcePreviewContainer) {
          elements.sourcePreviewContainer.addEventListener('mousedown', (e) => {
-             if (startPan(e, elements)) { // Use utility, checks if source is visible
+             if (startPan(e, elements)) {
                  stateManager.setDragging(true, e.pageX, e.pageY);
              }
          });
@@ -832,13 +835,13 @@ function setupEventListeners() {
              const { newOffsetX, newOffsetY } = panMove(e, panState.dragStartX, panState.dragStartY, panState.startOffsetX, panState.startOffsetY);
              stateManager.updatePanOffsets(newOffsetX, newOffsetY);
              const { clampedX, clampedY } = updateSourcePreviewTransform(elements, stateManager.getState());
-             stateManager.setCurrentOffsets(clampedX, clampedY); // Store clamped value
+             stateManager.setCurrentOffsets(clampedX, clampedY);
          });
          const endPanHandler = () => {
              if (stateManager.isDragging()) {
                  stateManager.setDragging(false);
-                 endPan(elements); // Update cursor
-                 requestFullUpdate(); // Update final preview after pan
+                 endPan(elements);
+                 requestFullUpdate();
              }
          };
          document.addEventListener('mouseup', endPanHandler);
@@ -930,7 +933,7 @@ function initializeApp() {
                 perlinScaleValue: document.getElementById('perlinScaleValue'),
                 perlinColor1: document.getElementById('perlinColor1'),
                 perlinColor2: document.getElementById('perlinColor2')
-            }; // End of elements definition (no sliders/selects arrays here)
+            };
             console.log("initializeApp: Elements object populated.");
 
             // --- Populate grouped sliders/selects arrays ---
@@ -940,13 +943,13 @@ function initializeApp() {
                 elements.preEffectIntensitySlider, elements.preEffectWaveAmplitudeSlider,
                 elements.preEffectWaveFrequencySlider, elements.preEffectWavePhaseSlider,
                 elements.sliceShiftIntensitySlider, elements.pixelSortThresholdSlider,
-                elements.perlinScale // Generator sliders
+                elements.perlinScale
             ].filter(el => el !== null);
 
             elements.selects = [
                 elements.preEffectSelector, elements.preEffectWaveDirection, elements.preEffectWaveType,
                 elements.sliceShiftDirection, elements.pixelSortDirection, elements.pixelSortBy,
-                 elements.generatorType // Generator selects
+                 elements.generatorType
             ].filter(el => el !== null);
             console.log(`initializeApp: Grouped ${elements.sliders.length} sliders and ${elements.selects.length} selects.`);
 
@@ -981,7 +984,7 @@ function initializeApp() {
             showMessage("Load an image OR generate a pattern to begin.", false, elements.messageBox);
             updateTilingControlsVisibility(elements, handleSliderChange);
             updatePreEffectControlsVisibility(elements);
-            updateGeneratorControlsVisibility(elements); // Show initial generator options
+            updateGeneratorControlsVisibility(elements);
 
             console.log("[MainApp] initializeApp - END - Ready.");
 
@@ -1006,4 +1009,4 @@ function initializeApp() {
 } // End initializeApp
 
 // --- Start the application ---
-document.addEventListener('DOMContentLoaded', initializeApp);
+document.addEventListener('DOMContentLoaded', initializeApp); // This should be the last executable line
