@@ -178,16 +178,18 @@ function redrawSourceCanvasWithEffect() {
  * This involves redrawing the source canvas (with effects preview) and then running the tiling process.
  */
 function requestFullUpdate() {
-    // Use a debounce timer to prevent rapid updates during slider changes
+    // Use a debounce timer stored potentially on the state object to prevent rapid updates
     let debounceTimer = stateManager.getState().debounceTimer; // Check if timer ID exists in state
     if (!debounceTimer) debounceTimer = null;
 
     if (debounceTimer) {
         clearTimeout(debounceTimer);
+         // Clear the stored timer ID in state if it exists
+         if (stateManager.getState().debounceTimer === debounceTimer) stateManager.getState().debounceTimer = null;
     }
 
-    // Store the new timer ID (e.g., in state or a local variable if state modification is complex)
-    const newTimerId = setTimeout(() => {
+    // Store the new timer ID (example using stateManager state)
+    const newTimerId = setTimeout(async () => { // Make async if using await inside
         // console.log('[MainApp] Debounce timer finished. Initiating full update.');
 
         const currentState = stateManager.getState(); // Get fresh state inside timeout
@@ -196,7 +198,7 @@ function requestFullUpdate() {
         if (!currentState.originalWidth || !currentState.originalHeight || !elements.sourceEffectCanvas || !sourceEffectCtx || currentState.isProcessing) {
             if (currentState.isProcessing) console.warn(" requestFullUpdate skipped: Already processing.");
             else console.warn(" requestFullUpdate skipped: Prerequisites failed (dimensions, canvas, or context missing).");
-            // Clear the timer ID reference
+            // Clear the timer ID reference if this timeout run is skipped
              if (stateManager.getState().debounceTimer === newTimerId) stateManager.getState().debounceTimer = null;
             return;
         }
@@ -221,6 +223,7 @@ function requestFullUpdate() {
 
             // 2. Process the redrawn source canvas for tiling
             // console.log(' requestFullUpdate: >>> Calling processAndPreviewImage <<<');
+            // Use await here if processAndPreviewImage becomes async in the future
             processAndPreviewImage(
                 elements.sourceEffectCanvas, // Pass the canvas containing the base + previewed effect
                 elements,
@@ -237,15 +240,15 @@ function requestFullUpdate() {
              showMessage(`Error updating preview: ${err.message || 'Unknown error'}`, true, elements.messageBox);
         } finally {
             stateManager.setProcessing(false);
-            // Clear the timer ID reference
+            // Clear the timer ID reference after execution completes
              if (stateManager.getState().debounceTimer === newTimerId) stateManager.getState().debounceTimer = null;
             // console.log('[MainApp] Finished full update processing.');
         }
 
     }, 150); // Debounce time (milliseconds)
 
-    // Store the timer ID (e.g., attach to stateManager state if needed globally)
-    stateManager.getState().debounceTimer = newTimerId; // Example: Store on state (ensure 'debounceTimer' exists in initial state if using this)
+    // Store the timer ID (example: attach to stateManager state if needed globally)
+    stateManager.getState().debounceTimer = newTimerId;
 }
 
 
@@ -271,7 +274,8 @@ function handleApplyEffectClick() {
     const historyInfo = stateManager.getHistoryInfo();
 
     // Need a base state (either loaded image or generated pattern) to apply effects to
-    if (!currentState.originalWidth || historyInfo.length === 0) {
+    // Check if history has been initialized
+    if (!currentState.originalWidth || historyInfo.length === 0 || historyInfo.index < 0) {
         showMessage("Load an image or generate a pattern first.", true, elements.messageBox); return;
     }
      if (!elements.sourceEffectCanvas || !sourceEffectCtx) {
@@ -301,6 +305,7 @@ function handleApplyEffectClick() {
 
          // Ensure canvas matches state dimensions
          if (elements.sourceEffectCanvas.width !== baseStateImageData.width || elements.sourceEffectCanvas.height !== baseStateImageData.height) {
+             console.warn("Canvas dimensions mismatch history state, resizing canvas.");
              elements.sourceEffectCanvas.width = baseStateImageData.width;
              elements.sourceEffectCanvas.height = baseStateImageData.height;
          }
@@ -329,7 +334,7 @@ function handleApplyEffectClick() {
 
     } catch (e) {
          console.error(" handleApplyEffectClick: Error applying effect or updating history:", e);
-         showMessage(`Error applying effect: ${e.message}`, true, elements.messageBox);
+         showMessage(`Error applying effect: ${e.message || 'Unknown error'}`, true, elements.messageBox);
     } finally {
         stateManager.setProcessing(false);
     }
@@ -341,7 +346,7 @@ function handleApplyEffectClick() {
  */
 function handleUndoClick() {
     console.log('[MainApp] handleUndoClick - START');
-     if (!sourceEffectCtx) { return; }
+     if (!sourceEffectCtx) { console.error("Undo: Missing context."); return; }
      if (stateManager.isProcessing()) { return; } // Prevent undo during processing
     const historyInfo = stateManager.getHistoryInfo();
     if (historyInfo.index <= 0) { return; } // Already at oldest state
@@ -366,6 +371,8 @@ function handleUndoClick() {
               console.error(" handleUndoClick: Error putting undone state on canvas:", e);
               showMessage("Error during Undo.", true, elements.messageBox);
          }
+    } else {
+         console.warn("Undo: stateManager.undoState() returned null.");
     }
     console.log('[MainApp] handleUndoClick - END');
 }
@@ -375,7 +382,7 @@ function handleUndoClick() {
  */
 function handleRedoClick() {
     console.log('[MainApp] handleRedoClick - START');
-     if (!sourceEffectCtx) { return; }
+     if (!sourceEffectCtx) { console.error("Redo: Missing context."); return; }
      if (stateManager.isProcessing()) { return; } // Prevent redo during processing
       const historyInfo = stateManager.getHistoryInfo();
      if (historyInfo.index >= historyInfo.length - 1) { return; } // Already at newest state
@@ -400,19 +407,19 @@ function handleRedoClick() {
              console.error(" handleRedoClick: Error putting redone state on canvas:", e);
              showMessage("Error during Redo.", true, elements.messageBox);
         }
-    }
+     } else {
+          console.warn("Redo: stateManager.redoState() returned null.");
+     }
     console.log('[MainApp] handleRedoClick - END');
 }
 
 /**
  * Gets the currently selected effect name and its parameters from the UI controls.
- * (No changes needed here as it only reads UI elements)
  */
 function getCurrentEffectAndParams() {
      const effect = elements.preEffectSelector?.value || 'none';
     const params = {
-        // Generic intensity is now handled specifically in updatePreEffectControlsVisibility
-        // We only read it here if the specific effect needs it by name
+        // Read generic intensity value regardless, specific cases below will delete/overwrite if necessary
         intensity: parseInt(elements.preEffectIntensitySlider?.value || 30, 10)
     };
 
@@ -423,24 +430,24 @@ function getCurrentEffectAndParams() {
             params.phase = parseInt(elements.preEffectWavePhaseSlider?.value || 0, 10) * (Math.PI / 180); // Convert degrees to radians
             params.direction = elements.preEffectWaveDirection?.value || 'horizontal';
             params.waveType = elements.preEffectWaveType?.value || 'sine';
-            delete params.intensity; // Remove generic intensity if specific params exist
+            delete params.intensity; // Remove generic intensity as specific params exist
             break;
         case 'sliceShift':
-            params.intensity = parseInt(elements.sliceShiftIntensitySlider?.value || 30, 10);
+            params.intensity = parseInt(elements.sliceShiftIntensitySlider?.value || 30, 10); // Uses its own intensity slider
             params.direction = elements.sliceShiftDirection?.value || 'horizontal';
-            // Keep intensity as it's the primary control here
+            // Keep intensity as it's the primary control here, read from sliceShift slider
             break;
         case 'pixelSort':
             params.threshold = parseInt(elements.pixelSortThresholdSlider?.value || 100, 10);
             params.direction = elements.pixelSortDirection?.value || 'horizontal';
             params.sortBy = elements.pixelSortBy?.value || 'brightness';
-            delete params.intensity;
+            delete params.intensity; // Uses specific controls, not generic intensity
             break;
         case 'scanLines':
              // Uses the generic intensity slider, labeled as "Darkness"
              params.intensity = parseInt(elements.preEffectIntensitySlider?.value || 50, 10);
             break;
-        // Effects using generic intensity slider:
+        // Effects using the *generic* intensity slider:
         case 'noise':
         case 'channelShift':
         case 'blockDisplace':
@@ -451,7 +458,8 @@ function getCurrentEffectAndParams() {
              break;
         case 'none':
         default:
-            delete params.intensity; // No params needed for 'none' or unknown effects
+            // For 'none' or unknown effects, remove the intensity param
+            delete params.intensity;
             break;
     }
     // console.log(`Effect: ${effect}, Params:`, params);
@@ -481,8 +489,8 @@ function handleSliderChange() {
 }
 
 /**
- * Handles changes for radio buttons and select dropdowns (tiling, mirroring, effects).
- * Calls relevant UI updates and requests a full preview update.
+ * Handles changes for radio buttons and select dropdowns (tiling, mirroring, effects, generator type).
+ * Calls relevant UI updates and requests a full preview update if necessary.
  */
 function handleOptionChange(event) {
     const target = event.target;
@@ -514,7 +522,8 @@ function handleOptionChange(event) {
 
     // Perform UI visibility updates synchronously
     if (needsTilingControlUpdate) {
-         if(elements.tilesXSlider) updateTilingControlsVisibility(elements, handleSliderChange); // Pass handler
+         // Pass handleSliderChange in case default scale needs updating
+         if(elements.tilesXSlider) updateTilingControlsVisibility(elements, handleSliderChange);
     }
     if (needsEffectControlUpdate) {
          if(elements.preEffectSelector) updatePreEffectControlsVisibility(elements);
@@ -590,10 +599,9 @@ function handleImageLoad(event) {
                  }
 
                  // --- State Reset and Setup ---
-                 stateManager.clearHistoryState(); // Clear previous history
+                 stateManager.clearHistoryState(); // Clear previous history FIRST
                  stateManager.setImageData(img, originalFileName); // Set new image and dimensions in state
-                 stateManager.setZoomLevel(1.0); // Reset zoom/pan for new image
-                 stateManager.setCurrentOffsets(0, 0);
+                 // State reset within setImageData handles zoom/pan reset
 
                  // --- Update UI Controls ---
                  // Set output dimensions to match loaded image
@@ -604,6 +612,8 @@ function handleImageLoad(event) {
                  if(elements.sourcePreview) {
                      elements.sourcePreview.src = e.target.result;
                      elements.sourcePreview.classList.remove('hidden');
+                     // Reset transform explicitly after setting src
+                     elements.sourcePreview.style.transform = 'translate(0px, 0px) scale(1)';
                  }
                  if(elements.sourcePreviewText) elements.sourcePreviewText.classList.add('hidden');
                  if(elements.sourcePreviewContainer) elements.sourcePreviewContainer.style.cursor = 'grab';
@@ -614,7 +624,7 @@ function handleImageLoad(event) {
                   elements.generatorType?.setAttribute('disabled', 'true');
                   elements.generatorWidth?.setAttribute('disabled', 'true');
                   elements.generatorHeight?.setAttribute('disabled', 'true');
-                  elements.perlinScale?.setAttribute('disabled', 'true');
+                  elements.perlinScale?.setAttribute('disabled', 'true'); // Disable specific generator controls
                   elements.perlinColor1?.setAttribute('disabled', 'true');
                   elements.perlinColor2?.setAttribute('disabled', 'true');
                   elements.generatePatternButton?.setAttribute('disabled', 'true');
@@ -626,10 +636,17 @@ function handleImageLoad(event) {
 
                     // Update visual pan/zoom transform (should be 0,0,1 initially)
                     const { clampedX, clampedY } = updateSourcePreviewTransform(elements, stateManager.getState());
-                    // stateManager.setCurrentOffsets(clampedX, clampedY); // Already set to 0,0
+                    // Ensure state reflects the initial 0,0 offsets after load
+                    stateManager.setCurrentOffsets(clampedX, clampedY);
 
                     // Resize source canvas
                     const {width: initialWidth, height: initialHeight} = stateManager.getOriginalDimensions();
+                     if (!initialWidth || !initialHeight) {
+                          console.error("Image Load: Invalid dimensions obtained from state manager.");
+                          resetAppForLoad();
+                          stateManager.setProcessing(false);
+                          return;
+                     }
                     elements.sourceEffectCanvas.width = initialWidth;
                     elements.sourceEffectCanvas.height = initialHeight;
 
@@ -639,7 +656,7 @@ function handleImageLoad(event) {
                              // Get ImageData and push as initial history state
                              const initialImageData = sourceEffectCtx.getImageData(0, 0, initialWidth, initialHeight);
                              stateManager.pushHistoryState(initialImageData);
-                             updateHistoryButtonsUI(); // Enable redo/undo if applicable (usually just undo)
+                             updateHistoryButtonsUI(); // Update button state after history push
                         } catch(histError) {
                              console.error(" Image Load: History init error:", histError);
                              showMessage("Error initializing image state.", true, elements.messageBox);
@@ -663,10 +680,10 @@ function handleImageLoad(event) {
                     elements.mirrorOptions?.forEach(opt => opt.disabled = false);
                     // Enable sliders/selects EXCEPT generator ones
                     elements.sliders?.forEach(s => {
-                        if(s && !s.closest('.generator-options')) s.disabled = false; // Check parent to exclude generator sliders
+                        if(s && s !== elements.perlinScale /* add other generator sliders here */ ) s.disabled = false;
                     });
                     elements.selects?.forEach(s => {
-                         if(s && s.id !== 'generatorType') s.disabled = false; // Check ID to exclude generator type select
+                         if(s && s !== elements.generatorType) s.disabled = false;
                     });
                     if(elements.outputWidthInput) elements.outputWidthInput.disabled = false;
                     if(elements.outputHeightInput) elements.outputHeightInput.disabled = false;
@@ -677,7 +694,7 @@ function handleImageLoad(event) {
                     // Update visibility based on defaults
                     updateTilingControlsVisibility(elements, handleSliderChange);
                     updatePreEffectControlsVisibility(elements);
-                    // updateGeneratorControlsVisibility(elements); // Keep generator controls hidden/disabled
+                    updateGeneratorControlsVisibility(elements); // Ensure generator options remain hidden/disabled
 
                     requestFullUpdate(); // Trigger initial preview
                     stateManager.setProcessing(false); // Loading complete
@@ -685,7 +702,7 @@ function handleImageLoad(event) {
                 });
             };
             img.onerror = () => {
-                 showMessage("Failed to load image data.", true, elements.messageBox);
+                 showMessage("Failed to load image data. The file might be corrupt or unsupported.", true, elements.messageBox);
                  resetAppForLoad();
                  stateManager.setProcessing(false);
             };
@@ -704,7 +721,6 @@ function handleImageLoad(event) {
          try { resetAppForLoad(); } catch (resetError) { /* ignore */ }
          stateManager.setProcessing(false); // Ensure flag is reset on error
     }
-    // console.log("[MainApp] handleImageLoad - END"); // Note: Async operations continue after this logs
 }
 
 
@@ -768,11 +784,10 @@ function handleGeneratePatternClick() {
              console.log(`Generated ImageData: ${generatedImageData.width}x${generatedImageData.height}`);
 
             // --- Reset State for Generated Source ---
-            stateManager.clearHistoryState(); // Clear previous history
+            stateManager.clearHistoryState(); // Clear previous history FIRST
             stateManager.setImageData(null, `generated_${generatorType}.png`); // Set source type (no Image obj), filename
             stateManager.setGeneratedDimensions(params.width, params.height); // Set dimensions in state
-            stateManager.setZoomLevel(1.0); // Reset zoom/pan
-            stateManager.setCurrentOffsets(0, 0);
+            // Zoom/pan reset happens within setImageData
 
             // --- Update UI Controls ---
             // Update Output Dimension UI to match generated size
@@ -785,15 +800,27 @@ function handleGeneratePatternClick() {
                     elements.sourcePreview.src = elements.sourceEffectCanvas.toDataURL(); // Get URL from canvas content
                     elements.sourcePreview.classList.remove('hidden');
                     elements.sourcePreview.style.transform = 'translate(0px, 0px) scale(1)'; // Reset transform visually
-                 } catch(e) { console.error("Error getting data URL for source preview:", e); }
+                 } catch(e) {
+                      console.error("Error getting data URL for source preview:", e);
+                      showMessage("Error updating source preview.", true, elements.messageBox);
+                 }
              }
              if(elements.sourcePreviewText) elements.sourcePreviewText.classList.add('hidden');
-             if(elements.sourcePreviewContainer) elements.sourcePreviewContainer.style.cursor = 'grab';
+             if(elements.sourcePreviewContainer) elements.sourcePreviewContainer.style.cursor = 'grab'; // Enable panning visually
              if(elements.sourceZoomSlider) elements.sourceZoomSlider.value = '1.0';
              if(elements.sourceZoomValueSpan) elements.sourceZoomValueSpan.textContent = '1.0';
 
-             // <<< Disable Image Loader after generating >>>
-             // elements.imageLoader.disabled = true; // Optional: prevent loading image after generate? Or allow override? Let's allow override for now.
+             // <<< Enable Image Loader after generating (Allow override) >>>
+              if(elements.imageLoader) elements.imageLoader.disabled = false;
+              // Keep generator controls enabled as well
+               elements.generatorType?.removeAttribute('disabled');
+               elements.generatorWidth?.removeAttribute('disabled');
+               elements.generatorHeight?.removeAttribute('disabled');
+               elements.perlinScale?.removeAttribute('disabled');
+               elements.perlinColor1?.removeAttribute('disabled');
+               elements.perlinColor2?.removeAttribute('disabled');
+               elements.generatePatternButton?.removeAttribute('disabled');
+
 
              // --- Push History & Enable Downstream ---
             stateManager.pushHistoryState(generatedImageData); // Push the generated pattern as the first state
@@ -801,12 +828,12 @@ function handleGeneratePatternClick() {
             // Enable relevant controls
             if(elements.saveButton) elements.saveButton.disabled = false;
             if(elements.applyEffectButton) elements.applyEffectButton.disabled = false;
-            if(elements.sourceZoomSlider) elements.sourceZoomSlider.disabled = false;
+            if(elements.sourceZoomSlider) elements.sourceZoomSlider.disabled = false; // Enable zoom
             elements.tileShapeOptions?.forEach(opt => opt.disabled = false);
             elements.mirrorOptions?.forEach(opt => opt.disabled = false);
-             // Enable sliders/selects EXCEPT generator ones (keep them enabled)
+             // Enable sliders/selects EXCEPT generator ones (they are already enabled)
             elements.sliders?.forEach(s => {
-                if(s && !s.closest('.generator-options')) s.disabled = false;
+                if(s && !s.closest('.generator-options') && s !== elements.sourceZoomSlider) s.disabled = false;
             });
             elements.selects?.forEach(s => {
                  if(s && s.id !== 'generatorType') s.disabled = false;
@@ -818,10 +845,10 @@ function handleGeneratePatternClick() {
 
 
             // --- Final UI Updates ---
-            updateHistoryButtonsUI(); // Should show undo enabled (back to blank state?)
+            updateHistoryButtonsUI();
             updateTilingControlsVisibility(elements, handleSliderChange);
             updatePreEffectControlsVisibility(elements);
-            // updateGeneratorControlsVisibility(elements); // Ensure correct generator options still shown
+            updateGeneratorControlsVisibility(elements); // Ensure correct generator options still shown
 
             requestFullUpdate(); // Trigger tiling preview
             showMessage(`Generated ${generatorType} pattern successfully.`, false, elements.messageBox);
@@ -829,7 +856,7 @@ function handleGeneratePatternClick() {
         } catch (error) {
             console.error("Error during pattern generation or state update:", error);
             showMessage(`Error generating pattern: ${error.message || 'Unknown error'}`, true, elements.messageBox);
-             // Consider resetting generator button?
+             // Consider resetting generator button state?
              // if (elements.generatePatternButton) elements.generatePatternButton.disabled = false;
         } finally {
             stateManager.setProcessing(false); // Generation attempt finished
@@ -909,7 +936,8 @@ function setupEventListeners() {
     // --- Source Inputs ---
     elements.imageLoader.addEventListener('change', handleImageLoad);
     elements.generatePatternButton?.addEventListener('click', handleGeneratePatternClick);
-    elements.generatorType?.addEventListener('change', () => updateGeneratorControlsVisibility(elements)); // Update options on generator type change
+    // <<< ADD Listener for Generator Type Change >>>
+    elements.generatorType?.addEventListener('change', () => updateGeneratorControlsVisibility(elements));
 
     // --- Action Buttons ---
     elements.saveButton?.addEventListener('click', saveImage);
@@ -948,11 +976,11 @@ function setupEventListeners() {
     setupSliderListener(elements.pixelSortThresholdSlider, elements.pixelSortThresholdValue, requestFullUpdate);
 
     // Generator Sliders (currently just update display, no immediate preview update needed)
-     setupSliderListener(elements.perlinScale, elements.perlinScaleValue, () => {
-         // No action needed on slider input, only on button click for generator
-         // Can add validation or live preview logic here later if desired
-     });
-     // Add setupSliderListener for other generator params here...
+     setupSliderListener(elements.perlinScale, elements.perlinScaleValue, handleSliderChange); // Call handleSliderChange to update span
+     // Add setupSliderListener for other generator params here... e.g., colors
+     elements.perlinColor1?.addEventListener('change', () => {/* maybe live preview later */});
+     elements.perlinColor2?.addEventListener('change', () => {/* maybe live preview later */});
+
 
     // Source Zoom Slider (updates state, transform, and requests full update)
     if (elements.sourceZoomSlider) {
@@ -1010,7 +1038,7 @@ function setupEventListeners() {
               // Note: requestFullUpdate is NOT called here for performance during drag. It's called on mouseup.
          });
 
-         const endPanHandler = () => {
+         const endPanHandler = (e) => { // Added 'e' parameter although not used in this handler
              if (stateManager.isDragging()) {
                  stateManager.setDragging(false); // Update dragging state
                  endPan(elements); // Update cursor via utility
@@ -1110,19 +1138,19 @@ function initializeApp() {
                 generatorType: document.getElementById('generatorType'),
                 generatorWidth: document.getElementById('generatorWidth'),
                 generatorHeight: document.getElementById('generatorHeight'),
-                // Perlin specific (add others later)
-                perlinOptions: document.getElementById('perlinOptions'), // Container div
+                perlinOptions: document.getElementById('perlinOptions'), // Container div for Perlin options
                 perlinScale: document.getElementById('perlinScale'),
                 perlinScaleValue: document.getElementById('perlinScaleValue'),
                 perlinColor1: document.getElementById('perlinColor1'),
                 perlinColor2: document.getElementById('perlinColor2'),
                 // Grouped elements for easier enable/disable
-                sliders: [],
-                selects: []
+                sliders: [], // Populated below
+                selects: []  // Populated below
             };
             console.log(" initializeApp: Elements object populated.");
 
             // --- Populate grouped sliders/selects arrays ---
+            // Filter out nulls in case elements are missing from HTML
             elements.sliders = [
                 elements.tilesXSlider, elements.tilesYSlider, elements.skewSlider, elements.staggerSlider,
                 elements.scaleSlider, elements.preTileXSlider, elements.preTileYSlider, elements.sourceZoomSlider,
@@ -1130,14 +1158,14 @@ function initializeApp() {
                 elements.preEffectWaveFrequencySlider, elements.preEffectWavePhaseSlider,
                 elements.sliceShiftIntensitySlider, elements.pixelSortThresholdSlider,
                 // <<< ADD Generator Sliders >>>
-                elements.perlinScale
-            ].filter(el => el !== null); // Filter out any elements that might be missing
+                elements.perlinScale // Add other generator sliders here
+            ].filter(el => el !== null);
 
             elements.selects = [
                 elements.preEffectSelector, elements.preEffectWaveDirection, elements.preEffectWaveType,
                 elements.sliceShiftDirection, elements.pixelSortDirection, elements.pixelSortBy,
                  // <<< ADD Generator Selects >>>
-                 elements.generatorType
+                 elements.generatorType // Add other generator selects here
             ].filter(el => el !== null);
             console.log(` initializeApp: Grouped ${elements.sliders.length} sliders and ${elements.selects.length} selects.`);
 
@@ -1153,15 +1181,15 @@ function initializeApp() {
 
             // --- Reset State and UI ---
             console.log(" initializeApp: Resetting stateManager data...");
-            stateManager.resetStateData();
+            stateManager.resetStateData(); // Reset data state first
             console.log(" initializeApp: Resetting UI...");
              // Call UI reset function, passing all necessary update callbacks
             resetUIState(elements,
-                () => updateTilingControlsVisibility(elements, handleSliderChange),
-                () => updatePreEffectControlsVisibility(elements),
-                handleSliderChange, // Pass main slider handler
-                updateHistoryButtonsUI, // Pass history button updater
-                () => updateGeneratorControlsVisibility(elements) // <<< Pass generator visibility updater
+                () => updateTilingControlsVisibility(elements, handleSliderChange), // Tiling controls update func
+                () => updatePreEffectControlsVisibility(elements),  // Effect controls update func
+                handleSliderChange, // Main slider handler (for updating spans initially)
+                updateHistoryButtonsUI, // History button update func
+                () => updateGeneratorControlsVisibility(elements) // Generator controls update func
             );
             console.log(" initializeApp: UI reset complete (generator controls initially enabled).");
 
@@ -1174,7 +1202,7 @@ function initializeApp() {
             updateHistoryButtonsUI(); // Ensure undo/redo are initially disabled
             // Update initial message
             showMessage("Load an image OR generate a pattern to begin.", false, elements.messageBox);
-            // Call initial visibility updates one last time after listeners are attached
+            // Call initial visibility updates one last time after listeners are attached and state is reset
             updateTilingControlsVisibility(elements, handleSliderChange);
             updatePreEffectControlsVisibility(elements);
             updateGeneratorControlsVisibility(elements); // Ensure correct generator options show initially
@@ -1183,11 +1211,12 @@ function initializeApp() {
 
         } catch (error) {
              console.error("***** CRITICAL ERROR DURING INITIALIZEAPP *****", error);
-             showMessage("Initialization failed critically. Check console for details.", true, elements.messageBox || null);
+             showMessage(`Initialization failed critically: ${error.message}. Check console.`, true, elements.messageBox || null);
              // Attempt to disable all controls to prevent further errors
              Object.values(elements).forEach(el => {
-                 if (el && typeof el.setAttribute === 'function' && el.tagName !== 'CANVAS' && el.tagName !== 'IMG' && el.tagName !== 'SPAN') {
-                     try { el.setAttribute('disabled', 'true'); } catch(e){}
+                 // Check if it's a form element that can be disabled
+                 if (el && typeof el.setAttribute === 'function' && typeof el.disabled === 'boolean') {
+                     try { el.disabled = true; } catch(e){}
                  }
              });
         }
