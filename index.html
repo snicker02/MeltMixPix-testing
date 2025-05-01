@@ -13,23 +13,63 @@
 <body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
 
     <div class="bg-white p-6 md:p-8 rounded-lg shadow-xl w-full max-w-4xl">
-        <h1 class="text-2xl md:text-3xl font-semibold mb-6 text-center text-gray-700">Image Tiler & Effects</h1>
+        <h1 class="text-2xl md:text-3xl font-semibold mb-6 text-center text-gray-700">MeltMixPix: Image & Pattern Tool</h1>
 
         <div class="mb-6">
-             <label for="imageLoader" class="block text-sm font-medium text-gray-600 mb-2">1. Choose an image:</label>
+             <label for="imageLoader" class="block text-sm font-medium text-gray-600 mb-2">1a. Choose an image:</label>
              <input type="file" id="imageLoader" name="imageLoader" accept="image/png, image/jpeg, image/gif" class="block w-full text-sm text-gray-500 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 rounded-md border border-gray-300 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
         </div>
 
+        <div class="mb-6 border-t pt-6">
+             <label class="block text-sm font-medium text-gray-600 mb-2">1b. Or Generate Pattern:</label>
+             <div class="bg-gray-50 p-4 rounded border border-gray-200">
+                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+                     <div>
+                         <label for="generatorType" class="block text-xs font-medium text-gray-600 mb-1">Algorithm:</label>
+                         <select id="generatorType" name="generatorType" class="block w-full text-sm border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500" disabled>
+                             <option value="perlin" selected>Perlin Noise</option>
+                             </select>
+                     </div>
+                      <div>
+                          <label for="generatorWidth" class="block text-xs font-medium text-gray-600 mb-1">Width (px):</label>
+                          <input type="number" id="generatorWidth" value="512" min="64" max="2048" step="16" class="w-full" disabled>
+                      </div>
+                      <div>
+                          <label for="generatorHeight" class="block text-xs font-medium text-gray-600 mb-1">Height (px):</label>
+                          <input type="number" id="generatorHeight" value="512" min="64" max="2048" step="16" class="w-full" disabled>
+                      </div>
+                 </div>
+                 <div id="perlinOptions" class="generator-options grid grid-cols-1 md:grid-cols-4 gap-4 mb-3">
+                     <div>
+                         <label for="perlinScale" class="slider-label">Scale (<span id="perlinScaleValue">50</span>):</label>
+                         <input type="range" id="perlinScale" name="perlinScale" min="5" max="200" value="50" step="1" class="w-full" disabled>
+                     </div>
+                     <div>
+                         <label for="perlinColor1" class="block text-xs font-medium text-gray-600 mb-1">Color 1:</label>
+                         <input type="color" id="perlinColor1" name="perlinColor1" value="#000000" class="w-full h-8 p-0 border-0 cursor-pointer" disabled>
+                     </div>
+                      <div>
+                          <label for="perlinColor2" class="block text-xs font-medium text-gray-600 mb-1">Color 2:</label>
+                          <input type="color" id="perlinColor2" name="perlinColor2" value="#ffffff" class="w-full h-8 p-0 border-0 cursor-pointer" disabled>
+                      </div>
+                 </div>
+                 <div class="text-center">
+                      <button id="generatePatternButton" class="bg-blue-500 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded text-sm disabled:opacity-50" disabled>
+                          Generate & Use Pattern
+                      </button>
+                 </div>
+             </div>
+        </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
             <div>
-                <label class="block text-sm font-medium text-gray-600 mb-2">Source (Pan & Zoom):</label>
+                <label class="block text-sm font-medium text-gray-600 mb-2">2. Source (Pan & Zoom):</label>
                 <div id="sourcePreviewContainer" class="preview-container border-dashed">
                     <img id="sourcePreview" src="#" alt="Original Image Preview" class="preview-image hidden"/>
-                    <span id="sourcePreviewText" class="preview-text">Load image to pan/zoom source</span>
+                    <span id="sourcePreviewText" class="preview-text">Load image or generate pattern</span>
                 </div>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-600 mb-2">Final Result:</label>
+                <label class="block text-sm font-medium text-gray-600 mb-2">Result Preview:</label>
                 <div id="finalPreviewContainer" class="preview-container border-solid">
                     <img id="finalPreview" src="#" alt="Processed Image Preview" class="preview-image hidden"/>
                     <span id="finalPreviewText" class="preview-text">Preview will appear here</span>
@@ -42,7 +82,7 @@
         </div>
 
         <div id="preEffectControls" class="mb-6 border-t pt-6">
-            <label class="block text-sm font-medium text-gray-600 mb-3">2. Apply Pre-Effect(s) Sequentially:</label>
+            <label class="block text-sm font-medium text-gray-600 mb-3">3. Apply Pre-Effect(s) Sequentially:</label>
             <div class="control-row mb-4 pb-3 border-b border-gray-200">
                  <label for="preEffectSelector">Effect:</label>
                  <select id="preEffectSelector" class="shadow-sm">
@@ -126,7 +166,7 @@
 
 
         <div class="mb-6 border-t pt-6">
-             <label class="block text-sm font-medium text-gray-600 mb-3">3. Adjust Tiling:</label>
+             <label class="block text-sm font-medium text-gray-600 mb-3">4. Adjust Tiling:</label>
              <div class="mb-4 pb-3 border-b border-gray-200 control-group">
                  <label class="block text-xs font-medium text-gray-600 mb-2">Tile Shape:</label>
                  <div class="flex flex-wrap gap-x-4 gap-y-1">
@@ -168,7 +208,7 @@
         </div>
 
         <div class="mb-6 border-t pt-6">
-             <label class="block text-sm font-medium text-gray-600 mb-3">4. Output Size:</label>
+             <label class="block text-sm font-medium text-gray-600 mb-3">5. Output Size:</label>
              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                 <div><label for="outputWidth" class="block text-xs font-medium text-gray-600 mb-1">Width (px):</label><input type="number" id="outputWidth" name="outputWidth" min="1" step="1" class="w-full" disabled></div>
                 <div><label for="outputHeight" class="block text-xs font-medium text-gray-600 mb-1">Height (px):</label><input type="number" id="outputHeight" name="outputHeight" min="1" step="1" class="w-full" disabled></div>
@@ -179,10 +219,8 @@
         <canvas id="sourceEffectCanvas" style="display:none;"></canvas>
         <canvas id="mirrorCanvas" style="display:none;"></canvas>
         <canvas id="preTileCanvas" style="display:none;"></canvas>
-        <canvas id="imageCanvas" style="display:none;"></canvas>
-
-        <div class="text-center mt-8 border-t pt-6">
-             <label class="block text-sm font-medium text-gray-600 mb-2">5. Save Final Image:</label>
+        <canvas id="imageCanvas" style="display:none;"></canvas> <div class="text-center mt-8 border-t pt-6">
+             <label class="block text-sm font-medium text-gray-600 mb-2">6. Save Final Image:</label>
              <button id="saveButton" class="bg-green-500 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed text-lg" disabled>
                  Save Image
              </button>
