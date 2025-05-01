@@ -130,7 +130,7 @@
               const scaledSideLength = sideLength * scaleFactor;
               const scaledSquareSide = scaledSideLength;
               const scaledTriangleSide = scaledSideLength; // Assuming equilateral
-              const actualTriHeight = scaledTriangleSide * SQRT3_OVER_2;
+              const actualTriHeight = scaledTriangleSide * 1.8;
               const actualSquareHeight = scaledSquareSide;
               const maxTileHeight = Math.max(actualSquareHeight, actualTriHeight);
 
