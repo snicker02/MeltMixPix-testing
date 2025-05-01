@@ -115,11 +115,9 @@
               let centerOffsetRatio = 0.5;// Ratio of sideLength for centering shapes (0.5 = middle)
               // --- End Adjustable Parameters ---
 
-              // Geometric constant
-              const SQRT3_OVER_2 = Math.sqrt(3) / 2; // ~0.866
 
               // Original sizing logic (potentially buggy, but kept for testing parameter changes)
-              const triHeightRel = 2.06;
+              const triHeightRel = .06;
               const avgRowHeight = (1 + triHeightRel) / 2; // Average relative height (still seems suspect)
               const safeNumTilesY = numTilesY > 0 ? numTilesY : 1;
               const sideLengthX = outputCanvas.width / (numTilesX > 0 ? numTilesX : 1);
@@ -130,7 +128,7 @@
               const scaledSideLength = sideLength * scaleFactor;
               const scaledSquareSide = scaledSideLength;
               const scaledTriangleSide = scaledSideLength; // Assuming equilateral
-              const actualTriHeight = scaledTriangleSide * 2.06;
+              const actualTriHeight = scaledTriangleSide * .06;
               const actualSquareHeight = scaledSquareSide;
               const maxTileHeight = Math.max(actualSquareHeight, actualTriHeight);
 
