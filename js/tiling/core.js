@@ -1,4 +1,4 @@
-// js/tiling/core.js (Refactored for stateManager - Adjusted square_triangle loop bounds)
+// js/tiling/core.js (Refactored - Revised square_triangle drawing logic)
  import {
      drawHexagonPath, drawOctagonPath, drawSquarePath,
      drawLTrominoPath, drawTrianglePath, drawRhombusPath
@@ -12,7 +12,7 @@
   * @param {Function} showMessageFunc - Function to display messages.
   */
  export function processAndPreviewImage(sourceCanvasForTiling, elements, stateSnapshot, showMessageFunc) {
-     console.log(" [tiling/core.js] processAndPreviewImage - START");
+     // console.log(" [tiling/core.js] processAndPreviewImage - START"); // Keep logs if needed
 
      // --- Get necessary elements ---
      const {
@@ -54,27 +54,19 @@
      // --- Step 0: Create Mirrored Image ---
      const sourceWidth = sourceCanvasForTiling.width;
      const sourceHeight = sourceCanvasForTiling.height;
-     if (!sourceWidth || !sourceHeight) {
-          console.error(" [tiling/core.js] sourceCanvasForTiling has zero dimensions.");
-          showMessageFunc("Error: Source image dimensions missing for mirroring.", true);
-          return;
-      }
+     if (!sourceWidth || !sourceHeight) { /* error handling */ return; }
      mirrorCanvas.width = sourceWidth;
      mirrorCanvas.height = sourceHeight;
      mirrorCtx.clearRect(0, 0, mirrorCanvas.width, mirrorCanvas.height);
      mirrorCtx.save();
-
      let scaleMx = 1, scaleMy = 1, transMx = 0, transMy = 0;
      if (mirrorType === 'horizontal' || mirrorType === 'both') { scaleMx = -1; transMx = mirrorCanvas.width; }
      if (mirrorType === 'vertical' || mirrorType === 'both') { scaleMy = -1; transMy = mirrorCanvas.height; }
      if (transMx !== 0 || transMy !== 0) mirrorCtx.translate(transMx, transMy);
      if (scaleMx !== 1 || scaleMy !== 1) mirrorCtx.scale(scaleMx, scaleMy);
-
-     try {
-         mirrorCtx.drawImage(sourceCanvasForTiling, 0, 0, mirrorCanvas.width, mirrorCanvas.height);
-     } catch (e) { console.error(" [tiling/core.js] Error drawing mirrored image:", e); mirrorCtx.restore(); return; }
+     try { mirrorCtx.drawImage(sourceCanvasForTiling, 0, 0, mirrorCanvas.width, mirrorCanvas.height); }
+     catch (e) { console.error(" [tiling/core.js] Error drawing mirrored image:", e); mirrorCtx.restore(); return; }
      mirrorCtx.restore();
-
 
      // --- Step 1: Create Pre-Tiled Image ---
      preTileCanvas.width = sourceWidth;
@@ -112,33 +104,32 @@
           // <<< MODIFIED square_triangle block >>>
           else if (selectedShape === 'square_triangle') {
               const triHeightRel = Math.sqrt(3) / 2;
-              // Calculate side length based on fitting numTilesX across the width
-              // and approximately numTilesY pairs of square/triangle rows down the height
-              const approxTotalRowHeight = (1 + triHeightRel); // Approx height of one square row + one triangle row in relative units
-              const sideLengthX = outputCanvas.width / numTilesX; // Width of one unit based on X count
-              const sideLengthY = outputCanvas.height / (numTilesY * approxTotalRowHeight); // Approx height of one unit based on Y count
-              const sideLength = Math.min(sideLengthX, sideLengthY); // Use smaller dimension to ensure fit
+              // Determine side length based on fitting tiles across width and rows down height
+              // A full repeating unit vertically is one square + one triangle row
+              const unitHeightFactor = 1 + triHeightRel; // Relative height of square(1) + triangle(sqrt(3)/2)
+              const sideLengthX = outputCanvas.width / numTilesX;
+              const sideLengthY = outputCanvas.height / (numTilesY * unitHeightFactor);
+              const sideLength = Math.min(sideLengthX, sideLengthY); // Base size for square/triangle sides
 
-              const squareSide = sideLength;
-              const triangleSide = sideLength;
-              const scaledSquareSide = squareSide * scaleFactor;
-              const scaledTriangleSide = triangleSide * scaleFactor;
-              const actualTriHeight = scaledTriangleSide * Math.sqrt(3) / 2;
+              const scaledSideLength = sideLength * scaleFactor; // Apply user scale
+              const scaledSquareSide = scaledSideLength;
+              const scaledTriangleSide = scaledSideLength; // Equilateral triangles
+              const actualTriHeight = scaledTriangleSide * triHeightRel;
               const actualSquareHeight = scaledSquareSide;
 
-              // Adjust loop bounds for better coverage
-              const numCols = Math.ceil(outputCanvas.width / sideLength) + 6; // Increased buffer
-              let currentY = -Math.max(actualSquareHeight, actualTriHeight) * 2.0; // Increased buffer
+              // Loop bounds (keep generous buffers)
+              const numCols = Math.ceil(outputCanvas.width / sideLength) + 6;
+              let currentY = -Math.max(actualSquareHeight, actualTriHeight) * 2.0;
               let rowCount = 0;
 
-              // Loop until we've definitely covered the bottom edge + buffer
-              while (currentY < outputCanvas.height + Math.max(actualSquareHeight, actualTriHeight) * 3) { // Increased buffer
+              while (currentY < outputCanvas.height + Math.max(actualSquareHeight, actualTriHeight) * 3) {
                   const isSquareRow = (rowCount % 2 === 0);
                   const currentRowHeight = isSquareRow ? actualSquareHeight : actualTriHeight;
-                  const isStaggered = (rowCount % 2 !== 0); // Stagger triangle rows relative to square rows
+                  // Stagger alternate rows (both square and triangle rows get staggered relative to the one before)
+                  const isStaggered = (rowCount % 2 !== 0);
 
-                  // Loop columns with buffer
-                  for (let c = -3; c < numCols; c++) { // Increased buffer
+                  for (let c = -3; c < numCols; c++) {
+                      // Base X for the start of the column cell (width = sideLength)
                       const cellBaseX = c * sideLength + (isStaggered ? sideLength / 2 : 0);
 
                       if (isSquareRow) {
@@ -147,22 +138,39 @@
                           outputCtx.save();
                           drawSquarePath(outputCtx, sqCenterX, sqCenterY, scaledSquareSide);
                           outputCtx.clip();
+                          // Draw image centered within the square
                           outputCtx.drawImage(preTileCanvas, sqCenterX - drawSourceWidth / 2, sqCenterY - drawSourceHeight / 2, drawSourceWidth, drawSourceHeight);
                           outputCtx.restore();
                       } else { // Triangle row
-                          // Triangles point up/down based on column index within the row
-                          const pointUp = (c % 2 === 0);
-                          const triCenterY = currentY + actualTriHeight / 2; // Center of triangle row height
-                          const triCenterX = cellBaseX + sideLength / 2; // Center horizontally within the column 'cell'
+                          // Center Y for triangles in this row
+                          const triCenterY = currentY + actualTriHeight / 2;
 
+                          // Calculate centers for the two triangles needed to fill the horizontal space
+                          const tri1CenterX = cellBaseX + sideLength * 0.25; // Center of the left triangle slot
+                          const tri2CenterX = cellBaseX + sideLength * 0.75; // Center of the right triangle slot
+
+                          // Determine orientation - they should alternate to fill the rectangle space
+                          const tri1PointsUp = true; // Or determine based on row/col if needed for pattern
+                          const tri2PointsUp = false;
+
+                          // Draw left triangle
                           outputCtx.save();
-                          drawTrianglePath(outputCtx, triCenterX, triCenterY, scaledTriangleSide, pointUp);
+                          drawTrianglePath(outputCtx, tri1CenterX, triCenterY, scaledTriangleSide, tri1PointsUp);
                           outputCtx.clip();
-                          outputCtx.drawImage(preTileCanvas, triCenterX - drawSourceWidth / 2, triCenterY - drawSourceHeight / 2, drawSourceWidth, drawSourceHeight);
+                          // Center the source image draw on the triangle's center
+                          outputCtx.drawImage(preTileCanvas, tri1CenterX - drawSourceWidth / 2, triCenterY - drawSourceHeight / 2, drawSourceWidth, drawSourceHeight);
+                          outputCtx.restore();
+
+                          // Draw right triangle
+                          outputCtx.save();
+                          drawTrianglePath(outputCtx, tri2CenterX, triCenterY, scaledTriangleSide, tri2PointsUp);
+                          outputCtx.clip();
+                          // Center the source image draw on the triangle's center
+                          outputCtx.drawImage(preTileCanvas, tri2CenterX - drawSourceWidth / 2, triCenterY - drawSourceHeight / 2, drawSourceWidth, drawSourceHeight);
                           outputCtx.restore();
                       }
                   }
-                  currentY += currentRowHeight;
+                  currentY += currentRowHeight; // Advance Y by the height of the row just drawn
                   rowCount++;
               }
           }
@@ -180,14 +188,14 @@
 
 
      // --- Step 3: Update Final Result Preview ---
-     console.log(" [tiling/core.js] Updating final result preview image...");
+    //  console.log(" [tiling/core.js] Updating final result preview image...");
      try {
           // Log output canvas content BEFORE generating DataURL
-          try {
-             console.log(` [tiling/core.js] Output canvas content BEFORE toDataURL (${outputCanvas.width}x${outputCanvas.height}) (Data URL potentially long):`, outputCanvas.toDataURL().substring(0, 100) + '...');
-          } catch (e) {
-              console.error(" [tiling/core.js] Error getting dataURL from output canvas:", e);
-          }
+        //   try {
+        //      console.log(` [tiling/core.js] Output canvas content BEFORE toDataURL (${outputCanvas.width}x${outputCanvas.height}) (Data URL potentially long):`, outputCanvas.toDataURL().substring(0, 100) + '...');
+        //   } catch (e) {
+        //       console.error(" [tiling/core.js] Error getting dataURL from output canvas:", e);
+        //   }
 
          const dataURL = outputCanvas.toDataURL('image/png'); // Use elements.canvas
 
