@@ -208,7 +208,8 @@ export function updateSourcePreviewTransform(elements, currentState) { // Accept
          return { clampedX: 0, clampedY: 0 };
     }
      if (!sourcePreview.naturalWidth || !sourcePreview.naturalHeight) {
-        console.warn('[uiUtils.updateSourcePreviewTransform] Source preview image has zero natural dimensions (likely not loaded). Resetting transform.');
+        // This state is normal before an image is loaded
+        // console.warn('[uiUtils.updateSourcePreviewTransform] Source preview image has zero natural dimensions (likely not loaded). Resetting transform.');
         sourcePreview.style.transform = 'translate(0px, 0px) scale(1)';
         return { clampedX: 0, clampedY: 0 };
     }
@@ -231,18 +232,14 @@ export function updateSourcePreviewTransform(elements, currentState) { // Accept
 
     if (scaledWidth <= containerWidth) {
         clampedX = (containerWidth - scaledWidth) / 2;
-        // console.log(`[uiUtils.updateSourcePreviewTransform] Image narrower than container, centering X to ${clampedX.toFixed(2)}px`);
     } else {
         clampedX = Math.max(minOffsetX, Math.min(maxOffsetX, currentOffsetX));
-        // if (clampedX !== currentOffsetX) console.log(`[uiUtils.updateSourcePreviewTransform] Clamped X offset from ${currentOffsetX.toFixed(2)} to ${clampedX.toFixed(2)} (Bounds: ${minOffsetX.toFixed(2)} to ${maxOffsetX.toFixed(2)})`);
     }
 
     if (scaledHeight <= containerHeight) {
         clampedY = (containerHeight - scaledHeight) / 2;
-        // console.log(`[uiUtils.updateSourcePreviewTransform] Image shorter than container, centering Y to ${clampedY.toFixed(2)}px`);
     } else {
         clampedY = Math.max(minOffsetY, Math.min(maxOffsetY, currentOffsetY));
-        // if (clampedY !== currentOffsetY) console.log(`[uiUtils.updateSourcePreviewTransform] Clamped Y offset from ${currentOffsetY.toFixed(2)} to ${clampedY.toFixed(2)} (Bounds: ${minOffsetY.toFixed(2)} to ${maxOffsetY.toFixed(2)})`);
     }
 
     const transformString = `translate(${clampedX.toFixed(2)}px, ${clampedY.toFixed(2)}px) scale(${sourceZoomLevel})`;
@@ -262,29 +259,22 @@ export function updateSourcePreviewTransform(elements, currentState) { // Accept
  */
 export function handleDimensionChange(event, elements, aspectRatio) { // Accepts aspectRatio
     const { outputWidthInput, outputHeightInput, keepAspectRatioCheckbox } = elements;
-    // No longer needs currentImage or full state object
     const changedInput = event.target;
 
-    // console.log(`[uiUtils.handleDimensionChange] Input change detected on element:`, changedInput);
-
-    if (!keepAspectRatioCheckbox?.checked) { /* console.log('[uiUtils.handleDimensionChange] Keep aspect ratio unchecked.'); */ return; }
+    if (!keepAspectRatioCheckbox?.checked) { return; }
     if (aspectRatio === null || aspectRatio <= 0) { console.warn('[uiUtils.handleDimensionChange] Aspect ratio unavailable or invalid.'); return; }
     if (!changedInput) { console.warn('[uiUtils.handleDimensionChange] Event target is null.'); return; }
 
     const newValue = parseInt(changedInput.value, 10);
-    if (isNaN(newValue) || newValue <= 0) { /* console.warn(`[uiUtils.handleDimensionChange] Invalid input value: ${changedInput.value}`); */ return; }
-
-    // console.log(`[uiUtils.handleDimensionChange] Changed value: ${newValue}, Aspect ratio: ${aspectRatio}`);
+    if (isNaN(newValue) || newValue <= 0) { return; }
 
     if (changedInput === outputWidthInput && outputHeightInput) {
         const calculatedHeight = Math.round(newValue / aspectRatio);
-        // console.log(`[uiUtils.handleDimensionChange] Calculating height: ${calculatedHeight}`);
         outputHeightInput.value = calculatedHeight;
     } else if (changedInput === outputHeightInput && outputWidthInput) {
         const calculatedWidth = Math.round(newValue * aspectRatio);
-        // console.log(`[uiUtils.handleDimensionChange] Calculating width: ${calculatedWidth}`);
         outputWidthInput.value = calculatedWidth;
-    } // else { console.warn('[uiUtils.handleDimensionChange] Changed input was neither width nor height.'); }
+    }
     // console.log('[uiUtils.handleDimensionChange] Dimension update complete.');
 }
 
@@ -381,8 +371,6 @@ export function resetUIState( // Renamed from resetState
         }
     });
 
-    // --- State Variables Reset - REMOVED (Handled by stateManager.resetStateData()) ---
-
     // --- Update Button States based on (now cleared) history ---
     if (typeof updateHistoryButtonsFunc === 'function') {
         // console.log('[uiUtils.resetUIState] Calling updateHistoryButtonsFunc callback...');
@@ -416,71 +404,61 @@ export function resetUIState( // Renamed from resetState
 
 // --- Panning Logic ---
 // These are now less critical as main.js handles the core logic using stateManager.
-// Keep them as simple state-less helpers if needed, or remove if fully unused.
 export function startPan(event, elements) { // Removed state param
-    // console.log(`[uiUtils.startPan] Pan start requested. Button: ${event.button}`);
-    // Logic requiring state (like currentImage check) should happen in the caller (main.js)
-    if (event.button !== 0) { /* console.log('[uiUtils.startPan] Ignoring pan start (not left button).'); */ return false; }
+    if (event.button !== 0) { return false; }
     if (event.target === elements?.sourcePreview) { event.preventDefault(); }
-    // console.log(`[uiUtils.startPan] Pan initiated visually.`);
     if (elements?.sourcePreviewContainer) { elements.sourcePreviewContainer.style.cursor = 'grabbing'; }
     return true; // Indicate pan can start
 }
 
 export function panMove(event, startDragX, startDragY, startOffsetX, startOffsetY) { // Removed state, accepts start values
-    // Calculates new offsets based on drag delta, returns them
     const dx = event.pageX - startDragX;
     const dy = event.pageY - startDragY;
     const newOffsetX = startOffsetX + dx;
     const newOffsetY = startOffsetY + dy;
     return { newOffsetX, newOffsetY };
-    // Clamping and state update should happen in the caller (main.js) after calling updateSourcePreviewTransform
 }
 
 export function endPan(elements) { // Removed state param and callbackFunc
-//    console.log('[uiUtils.endPan] Pan end requested.');
-   // The caller (main.js) now handles setting dragging state to false and triggering updates.
    if(elements?.sourcePreviewContainer) { elements.sourcePreviewContainer.style.cursor = 'grab'; }
-   // console.log('[uiUtils.endPan] Visual cleanup done.');
 }
 
 // --- Source Zoom Logic ---
-// Simplified - main.js reads slider, calls stateManager, calls updateSourcePreviewTransform
-export function handleSourceZoom(elements, currentStateSnapshot, stateUpdateFunc) { // Now accepts snapshot and update callback
+// This function is less used now, main.js handles the logic directly with stateManager.
+// Kept here for potential reuse, but signature updated.
+export function handleSourceZoom(elements, currentStateSnapshot, stateUpdateFunc) {
     // console.log('[uiUtils.handleSourceZoom] Zoom handling triggered.');
-    if (!currentStateSnapshot?.currentImage) { /* console.warn('[uiUtils.handleSourceZoom] No current image.'); */ return; }
-    if (!elements?.sourceZoomSlider) { console.warn('[uiUtils.handleSourceZoom] Source zoom slider element not found.'); return; }
-
+    if (!currentStateSnapshot?.currentImage) { return; }
+    if (!elements?.sourceZoomSlider) { return; }
     const newZoomLevel = parseFloat(elements.sourceZoomSlider.value);
-    // console.log(`[uiUtils.handleSourceZoom] New zoom level from slider: ${newZoomLevel.toFixed(2)}`);
-
-    // Update the display immediately
     if (elements.sourceZoomValueSpan) { elements.sourceZoomValueSpan.textContent = newZoomLevel.toFixed(1); }
-
-    // Call the state update function provided by main.js
-    if (typeof stateUpdateFunc === 'function') {
-        stateUpdateFunc(newZoomLevel); // Pass the new zoom level to main.js handler
-    } else {
-         console.warn('[uiUtils.handleSourceZoom] stateUpdateFunc not provided.');
-    }
-     // console.log('[uiUtils.handleSourceZoom] Zoom handling complete.');
+    if (typeof stateUpdateFunc === 'function') { stateUpdateFunc(newZoomLevel); }
 }
 
 /**
  * Sets up an event listener for a slider. (No changes needed)
  */
 export function setupSliderListener(slider, valueDisplay, callback, formatter = val => val) {
-    if (!slider) { console.warn('[uiUtils.setupSliderListener] Slider element not provided.'); return; }
+    if (!slider) { return; }
     if (!valueDisplay) { console.warn(`[uiUtils.setupSliderListener] Value display element not provided for slider:`, slider); }
-    // console.log(`[uiUtils.setupSliderListener] Setting up listener for slider:`, slider);
     const update = () => {
         const currentValue = slider.value;
-        if (valueDisplay) { try { valueDisplay.textContent = formatter(currentValue); } catch (e) { console.error(`[uiUtils.setupSliderListener] Error in formatter for slider:`, slider, e); valueDisplay.textContent = currentValue; } }
-        if (typeof callback === 'function') { try { callback(); } catch (e) { console.error(`[uiUtils.setupSliderListener] Error in callback for slider:`, slider, e); } }
+        if (valueDisplay) { try { valueDisplay.textContent = formatter(currentValue); } catch (e) { /* handle error */ } }
+        if (typeof callback === 'function') { try { callback(); } catch (e) { /* handle error */ } }
     };
     slider.addEventListener('input', update);
-    // console.log(`[uiUtils.setupSliderListener] Initial update call for slider:`, slider);
     update(); // Initial update
 }
+
+/**
+ * Updates the enabled/disabled state of undo/redo buttons based on history info.
+ * @param {object} elements - Object containing references to undoButton and redoButton.
+ * @param {object} historyInfo - Object like { index: number, length: number }.
+ */
+export function updateUndoRedoButtons(elements, historyInfo) { // Accepts historyInfo
+    if (elements.undoButton) elements.undoButton.disabled = historyInfo.index <= 0;
+    if (elements.redoButton) elements.redoButton.disabled = historyInfo.index >= historyInfo.length - 1;
+}
+
 
 console.log('[uiUtils] Module loaded successfully.');
