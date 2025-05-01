@@ -111,7 +111,7 @@
               let startCol = -2;          // How many columns left of the first visible column to start drawing
               let colBuffer = 4;          // How many extra columns to draw to the right
               let staggerRatio = 0.5;     // How much to stagger odd rows (0.5 = half a tile width)
-              let centerOffsetRatio = 0.5;// Ratio of sideLength for centering shapes (0.5 = middle)
+              let centerOffsetRatio = 1.5;// Ratio of sideLength for centering shapes (0.5 = middle)
               // --- End Adjustable Parameters ---
 
               // Geometric constant
