@@ -119,7 +119,7 @@
               const SQRT3_OVER_2 = Math.sqrt(3) / 2; // ~0.866
 
               // Original sizing logic (potentially buggy, but kept for testing parameter changes)
-              const triHeightRel = SQRT3_OVER_2;
+              const triHeightRel = 1.8;
               const avgRowHeight = (1 + triHeightRel) / 2; // Average relative height (still seems suspect)
               const safeNumTilesY = numTilesY > 0 ? numTilesY : 1;
               const sideLengthX = outputCanvas.width / (numTilesX > 0 ? numTilesX : 1);
