@@ -44,7 +44,7 @@
         <div id="preEffectControls" class="mb-6 border-t pt-6">
             <label class="block text-sm font-medium text-gray-600 mb-3">2. Apply Pre-Effect(s) Sequentially:</label>
             <div class="control-row mb-4 pb-3 border-b border-gray-200">
-                <label for="preEffectSelector">Effect:</label>
+                 <label for="preEffectSelector">Effect:</label>
                  <select id="preEffectSelector" class="shadow-sm">
                      <option value="none" selected>None</option>
                      <option value="noise">Noise</option>
@@ -65,10 +65,61 @@
                   <button id="redoButton" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-1 px-3 rounded text-xs disabled:opacity-50" title="Redo Last Undo" disabled>Redo</button>
              </div>
             <div id="preEffectOptionsContainer" class="effect-options">
-                <div id="preEffectIntensityControl" class="effect-option-group hidden"> /* ... */ </div>
-                <div id="sliceShiftOptions" class="effect-option-group hidden"> /* ... */ </div>
-                <div id="pixelSortOptions" class="effect-option-group hidden"> /* ... */ </div>
-                <div id="preEffectWaveDistortionOptions" class="effect-option-group hidden"> /* ... */ </div>
+                <div id="preEffectIntensityControl" class="effect-option-group hidden">
+                     <div>
+                         <label for="preEffectIntensitySlider">Intensity/Depth:</label>
+                         <input type="range" id="preEffectIntensitySlider" min="1" max="100" value="30"> <span id="preEffectIntensityValue">30</span>
+                     </div>
+                </div>
+                 <div id="sliceShiftOptions" class="effect-option-group hidden">
+                     <div class="effect-option-label">Slice Shift Options</div>
+                     <div>
+                        <label for="sliceShiftDirection">Direction:</label>
+                        <select id="sliceShiftDirection">
+                            <option value="horizontal" selected>Horizontal</option>
+                            <option value="vertical">Vertical</option>
+                        </select>
+                    </div>
+                     <div>
+                         <label for="sliceShiftIntensitySlider">Amount:</label>
+                         <input type="range" id="sliceShiftIntensitySlider" min="1" max="100" value="30">
+                         <span id="sliceShiftIntensityValue">30</span>
+                     </div>
+                </div>
+                 <div id="pixelSortOptions" class="effect-option-group hidden">
+                     <div class="effect-option-label">Pixel Sort Options</div>
+                     <div>
+                         <label for="pixelSortThresholdSlider">Threshold:</label>
+                         <input type="range" id="pixelSortThresholdSlider" min="0" max="255" value="100">
+                         <span id="pixelSortThresholdValue">100</span>
+                     </div>
+                     <div>
+                         <label for="pixelSortDirection">Direction:</label>
+                         <select id="pixelSortDirection">
+                             <option value="horizontal" selected>Horizontal</option>
+                             <option value="vertical">Vertical</option>
+                         </select>
+                     </div>
+                     <div>
+                         <label for="pixelSortBy">Sort By:</label>
+                         <select id="pixelSortBy">
+                             <option value="brightness" selected>Brightness</option>
+                             <option value="hue">Hue</option>
+                             <option value="saturation">Saturation</option>
+                             <option value="red">Red</option>
+                             <option value="green">Green</option>
+                             <option value="blue">Blue</option>
+                         </select>
+                     </div>
+                 </div>
+                <div id="preEffectWaveDistortionOptions" class="effect-option-group hidden">
+                     <div class="effect-option-label">Wave Distortion Options</div>
+                     <div><label for="preEffectWaveAmplitudeSlider">Amplitude:</label><input type="range" id="preEffectWaveAmplitudeSlider" min="0" max="50" value="10"><span id="preEffectWaveAmplitudeValue">10</span></div>
+                      <div><label for="preEffectWaveFrequencySlider">Frequency:</label><input type="range" id="preEffectWaveFrequencySlider" min="1" max="50" value="5"><span id="preEffectWaveFrequencyValue">5</span></div>
+                     <div><label for="preEffectWavePhaseSlider">Phase Shift:</label><input type="range" id="preEffectWavePhaseSlider" min="0" max="360" value="0"><span id="preEffectWavePhaseValue">0&deg;</span></div>
+                     <div><label for="preEffectWaveDirection">Direction:</label><select id="preEffectWaveDirection"><option value="horizontal" selected>Horizontal</option><option value="vertical">Vertical</option><option value="both">Both</option></select></div>
+                     <div><label for="preEffectWaveType">Type:</label><select id="preEffectWaveType"><option value="sine" selected>Sine</option><option value="cosine">Cosine</option></select></div>
+                </div>
             </div>
              <p id="preEffectRealtimeWarning" class="text-xs text-gray-500 text-center mt-1 hidden">Effect preview applied before tiling. Some effects may be slow.</p>
         </div>
@@ -113,34 +164,11 @@
                  <div class="md:col-span-2"> <label for="preTileY" class="slider-label">Pre-Tile Grid Y (<span id="preTileYValue">1</span>):</label> <input type="range" id="preTileY" name="preTileY" min="1" max="10" value="1" step="1" class="w-full"> </div>
                  <div class="md:col-span-1"></div>
              </div>
-
-             <div class="mt-4 pt-4 border-t border-dashed border-gray-300">
-                <div class="control-group">
-                    <label class="inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="showAdvancedTilingToggle" class="form-checkbox h-4 w-4 text-blue-600">
-                        <span class="ml-2 text-xs font-medium text-gray-600">Show Advanced Tiling Options</span>
-                    </label>
-                </div>
-
-                <div id="advancedTilingOptions" class="hidden mt-2 pl-4 border-l-2 border-gray-200">
-                     <div id="squareTriangleControls" class="control-group hidden-control mt-3 pt-3">
-                        <label class="block text-xs font-medium text-gray-500 mb-2 col-span-full md:col-span-5">Square/Triangle Debug Parameters:</label>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3 items-start">
-                            <div> <label for="sqTriYStartMult" class="slider-label">Y Start Mult (<span id="sqTriYStartMultValue">1.5</span>):</label> <input type="range" id="sqTriYStartMult" min="0" max="5" step="0.1" value="1.5" class="w-full"> </div>
-                            <div> <label for="sqTriYEndMult" class="slider-label">Y End Mult (<span id="sqTriYEndMultValue">2.0</span>):</label> <input type="range" id="sqTriYEndMult" min="0" max="5" step="0.1" value="2.0" class="w-full"> </div>
-                            <div> <label for="sqTriStartCol" class="slider-label">Start Col (<span id="sqTriStartColValue">-2</span>):</label> <input type="range" id="sqTriStartCol" min="-10" max="0" step="1" value="-2" class="w-full"> </div>
-                            <div> <label for="sqTriColBuffer" class="slider-label">Col Buffer (<span id="sqTriColBufferValue">4</span>):</label> <input type="range" id="sqTriColBuffer" min="0" max="10" step="1" value="4" class="w-full"> </div>
-                            <div> <label for="sqTriStaggerRatio" class="slider-label">Stagger Ratio (<span id="sqTriStaggerRatioValue">0.50</span>):</label> <input type="range" id="sqTriStaggerRatio" min="0" max="1" step="0.05" value="0.5" class="w-full"> </div>
-                            <div> <label for="sqTriCenterRatio" class="slider-label">Center Ratio (<span id="sqTriCenterRatioValue">0.50</span>):</label> <input type="range" id="sqTriCenterRatio" min="0" max="1" step="0.05" value="0.5" class="w-full"> </div>
-                        </div>
-                     </div>
-                     </div>
-             </div>
              <p class="text-xs text-gray-500 mt-2 text-center">Adjust sliders to see the effect. Pre-Tile Grid controls the pattern scale within each tile.</p>
         </div>
 
         <div class="mb-6 border-t pt-6">
-            <label class="block text-sm font-medium text-gray-600 mb-3">4. Output Size:</label>
+             <label class="block text-sm font-medium text-gray-600 mb-3">4. Output Size:</label>
              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                 <div><label for="outputWidth" class="block text-xs font-medium text-gray-600 mb-1">Width (px):</label><input type="number" id="outputWidth" name="outputWidth" min="1" step="1" class="w-full" disabled></div>
                 <div><label for="outputHeight" class="block text-xs font-medium text-gray-600 mb-1">Height (px):</label><input type="number" id="outputHeight" name="outputHeight" min="1" step="1" class="w-full" disabled></div>
