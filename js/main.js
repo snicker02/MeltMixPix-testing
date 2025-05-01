@@ -680,10 +680,15 @@ function handleImageLoad(event) {
                     elements.mirrorOptions?.forEach(opt => opt.disabled = false);
                     // Enable sliders/selects EXCEPT generator ones
                     elements.sliders?.forEach(s => {
-                        if(s && s !== elements.perlinScale /* add other generator sliders here */ ) s.disabled = false;
+                        // Check if element exists and is NOT a generator control before enabling
+                        if(s && s !== elements.perlinScale /* && s !== elements.otherGenSlider... */) {
+                            s.disabled = false;
+                        }
                     });
                     elements.selects?.forEach(s => {
-                         if(s && s !== elements.generatorType) s.disabled = false;
+                         if(s && s !== elements.generatorType) {
+                             s.disabled = false;
+                         }
                     });
                     if(elements.outputWidthInput) elements.outputWidthInput.disabled = false;
                     if(elements.outputHeightInput) elements.outputHeightInput.disabled = false;
@@ -816,7 +821,7 @@ function handleGeneratePatternClick() {
                elements.generatorType?.removeAttribute('disabled');
                elements.generatorWidth?.removeAttribute('disabled');
                elements.generatorHeight?.removeAttribute('disabled');
-               elements.perlinScale?.removeAttribute('disabled');
+               elements.perlinScale?.removeAttribute('disabled'); // Enable specific controls
                elements.perlinColor1?.removeAttribute('disabled');
                elements.perlinColor2?.removeAttribute('disabled');
                elements.generatePatternButton?.removeAttribute('disabled');
@@ -831,12 +836,16 @@ function handleGeneratePatternClick() {
             if(elements.sourceZoomSlider) elements.sourceZoomSlider.disabled = false; // Enable zoom
             elements.tileShapeOptions?.forEach(opt => opt.disabled = false);
             elements.mirrorOptions?.forEach(opt => opt.disabled = false);
-             // Enable sliders/selects EXCEPT generator ones (they are already enabled)
+             // Enable sliders/selects EXCEPT generator ones (they should remain enabled)
             elements.sliders?.forEach(s => {
-                if(s && !s.closest('.generator-options') && s !== elements.sourceZoomSlider) s.disabled = false;
+                if(s && s !== elements.perlinScale /* && s !== elements.otherGenSlider... */) {
+                     s.disabled = false;
+                }
             });
             elements.selects?.forEach(s => {
-                 if(s && s.id !== 'generatorType') s.disabled = false;
+                 if(s && s !== elements.generatorType) {
+                     s.disabled = false;
+                 }
             });
             if(elements.outputWidthInput) elements.outputWidthInput.disabled = false;
             if(elements.outputHeightInput) elements.outputHeightInput.disabled = false;
@@ -845,7 +854,7 @@ function handleGeneratePatternClick() {
 
 
             // --- Final UI Updates ---
-            updateHistoryButtonsUI();
+            updateHistoryButtonsUI(); // Update undo state
             updateTilingControlsVisibility(elements, handleSliderChange);
             updatePreEffectControlsVisibility(elements);
             updateGeneratorControlsVisibility(elements); // Ensure correct generator options still shown
@@ -1058,6 +1067,7 @@ function initializeApp() {
 
       try {
             // --- Populate the 'elements' object ---
+            // Assign all elements first
             elements = {
                 // Input/Output
                 imageLoader: document.getElementById('imageLoader'),
@@ -1082,7 +1092,7 @@ function initializeApp() {
                 applyEffectButton: document.getElementById('applyEffectButton'),
                 undoButton: document.getElementById('undoButton'),
                 redoButton: document.getElementById('redoButton'),
-                generatePatternButton: document.getElementById('generatePatternButton'), // <<< ADDED
+                generatePatternButton: document.getElementById('generatePatternButton'),
                 // Source Zoom
                 sourceZoomSlider: document.getElementById('sourceZoom'),
                 sourceZoomValueSpan: document.getElementById('sourceZoomValue'),
@@ -1134,7 +1144,7 @@ function initializeApp() {
                 pixelSortThresholdValue: document.getElementById('pixelSortThresholdValue'),
                 pixelSortDirection: document.getElementById('pixelSortDirection'),
                 pixelSortBy: document.getElementById('pixelSortBy'),
-                // <<< ADD Generator Element References >>>
+                // Generator Elements
                 generatorType: document.getElementById('generatorType'),
                 generatorWidth: document.getElementById('generatorWidth'),
                 generatorHeight: document.getElementById('generatorHeight'),
@@ -1142,40 +1152,33 @@ function initializeApp() {
                 perlinScale: document.getElementById('perlinScale'),
                 perlinScaleValue: document.getElementById('perlinScaleValue'),
                 perlinColor1: document.getElementById('perlinColor1'),
-                perlinColor2: document.getElementById('perlinColor2'),
-                // Grouped elements for easier enable/disable
-                sliders: [], // Populated below
-                selects: []  // Populated below
+                perlinColor2: document.getElementById('perlinColor2')
+                // sliders/selects arrays will be populated after this block
             };
             console.log(" initializeApp: Elements object populated.");
 
-            // --- Populate grouped sliders/selects arrays ---
-            // Filter out nulls in case elements are missing from HTML
+            // --- Populate grouped sliders/selects arrays (Done *after* elements obj is defined) ---
             elements.sliders = [
                 elements.tilesXSlider, elements.tilesYSlider, elements.skewSlider, elements.staggerSlider,
                 elements.scaleSlider, elements.preTileXSlider, elements.preTileYSlider, elements.sourceZoomSlider,
                 elements.preEffectIntensitySlider, elements.preEffectWaveAmplitudeSlider,
                 elements.preEffectWaveFrequencySlider, elements.preEffectWavePhaseSlider,
                 elements.sliceShiftIntensitySlider, elements.pixelSortThresholdSlider,
-                // <<< ADD Generator Sliders >>>
-                elements.perlinScale // Add other generator sliders here
-            ].filter(el => el !== null);
+                elements.perlinScale // <<< ADD Generator Sliders
+            ].filter(el => el !== null); // Filter out any missing elements
 
             elements.selects = [
                 elements.preEffectSelector, elements.preEffectWaveDirection, elements.preEffectWaveType,
                 elements.sliceShiftDirection, elements.pixelSortDirection, elements.pixelSortBy,
-                 // <<< ADD Generator Selects >>>
-                 elements.generatorType // Add other generator selects here
+                 elements.generatorType // <<< ADD Generator Selects
             ].filter(el => el !== null);
             console.log(` initializeApp: Grouped ${elements.sliders.length} sliders and ${elements.selects.length} selects.`);
 
             // --- Get initial context ---
             console.log(" initializeApp: Getting sourceEffectCtx...");
-            sourceEffectCtx = elements.sourceEffectCanvas?.getContext('2d', { willReadFrequently: true }); // Use willReadFrequently
+            sourceEffectCtx = elements.sourceEffectCanvas?.getContext('2d', { willReadFrequently: true });
             if (!sourceEffectCtx) {
-                console.error(" initializeApp: CRITICAL - Failed to get context for sourceEffectCanvas!");
-                if (elements.messageBox) showMessage("Initialization Error: Cannot get canvas context.", true, elements.messageBox);
-                return; // Stop initialization if context fails
+                throw new Error("CRITICAL - Failed to get context for sourceEffectCanvas!"); // Throw error to be caught below
             }
             console.log(" initializeApp: sourceEffectCtx obtained.");
 
@@ -1189,7 +1192,7 @@ function initializeApp() {
                 () => updatePreEffectControlsVisibility(elements),  // Effect controls update func
                 handleSliderChange, // Main slider handler (for updating spans initially)
                 updateHistoryButtonsUI, // History button update func
-                () => updateGeneratorControlsVisibility(elements) // Generator controls update func
+                () => updateGeneratorControlsVisibility(elements) // <<< Generator controls update func
             );
             console.log(" initializeApp: UI reset complete (generator controls initially enabled).");
 
@@ -1200,7 +1203,6 @@ function initializeApp() {
 
             // --- Final Initial UI State ---
             updateHistoryButtonsUI(); // Ensure undo/redo are initially disabled
-            // Update initial message
             showMessage("Load an image OR generate a pattern to begin.", false, elements.messageBox);
             // Call initial visibility updates one last time after listeners are attached and state is reset
             updateTilingControlsVisibility(elements, handleSliderChange);
@@ -1209,16 +1211,22 @@ function initializeApp() {
 
             console.log("[MainApp] initializeApp - END - Ready.");
 
-        } catch (error) {
+        } catch (error) { // Catch errors during initialization
              console.error("***** CRITICAL ERROR DURING INITIALIZEAPP *****", error);
-             showMessage(`Initialization failed critically: ${error.message}. Check console.`, true, elements.messageBox || null);
-             // Attempt to disable all controls to prevent further errors
-             Object.values(elements).forEach(el => {
-                 // Check if it's a form element that can be disabled
-                 if (el && typeof el.setAttribute === 'function' && typeof el.disabled === 'boolean') {
-                     try { el.disabled = true; } catch(e){}
-                 }
+             // Try to display error message even if elements.messageBox failed
+             const msgBox = document.getElementById('messageBox'); // Try to get it again
+             const errorMsg = `Initialization failed critically: ${error.message}. Check console.`;
+             if (msgBox) showMessage(errorMsg, true, msgBox);
+             else alert(errorMsg); // Fallback to alert
+
+             // Attempt to disable all interactive elements found to prevent further errors
+             const interactiveTags = ['INPUT', 'BUTTON', 'SELECT', 'TEXTAREA'];
+             document.querySelectorAll(interactiveTags.join(',')).forEach(el => {
+                 try {
+                     el.disabled = true;
+                 } catch(e) {}
              });
+             console.log("Attempted to disable all form controls due to initialization error.");
         }
 }
 
