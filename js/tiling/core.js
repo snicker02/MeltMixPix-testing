@@ -1,4 +1,4 @@
-// js/tiling/core.js (Refactored - Revised square_triangle SIZING logic)
+// js/tiling/core.js (REVERTED - Before square_triangle sizing fix attempt)
  import {
      drawHexagonPath, drawOctagonPath, drawSquarePath,
      drawLTrominoPath, drawTrianglePath, drawRhombusPath
@@ -12,7 +12,7 @@
   * @param {Function} showMessageFunc - Function to display messages.
   */
  export function processAndPreviewImage(sourceCanvasForTiling, elements, stateSnapshot, showMessageFunc) {
-     // console.log(" [tiling/core.js] processAndPreviewImage - START");
+     // console.log(" [tiling/core.js] processAndPreviewImage - START"); // Keep logs if needed
 
      // --- Get necessary elements ---
      const {
@@ -31,7 +31,7 @@
      // --- Get Contexts ---
      const mirrorCtx = mirrorCanvas?.getContext('2d');
      const preTileCtx = preTileCanvas?.getContext('2d');
-     const outputCanvas = elements.canvas;
+     const outputCanvas = elements.canvas; // Use a distinct variable name for clarity
      const outputCtx = outputCanvas.getContext('2d');
 
      if (!mirrorCtx || !preTileCtx || !outputCtx) {
@@ -92,89 +92,70 @@
 
      try {
          // --- Shape-Specific Drawing Logic (Draws onto outputCtx) ---
-          if (selectedShape === 'grid') { /* ... */ }
-          else if (selectedShape === 'brick_wall') { /* ... */ }
-          else if (selectedShape === 'herringbone') { /* ... */ }
-          else if (selectedShape === 'skewed') { /* ... */ }
-          else if (selectedShape === 'hexagon') { /* ... */ }
-          else if (selectedShape === 'semi_octagon_square') { /* ... */ }
-          else if (selectedShape === 'l_shape_square') { /* ... */ }
-          else if (selectedShape === 'hexagon_triangle') { /* ... */ }
+          if (selectedShape === 'grid') { const tileWidth=outputCanvas.width/numTilesX;const tileHeight=outputCanvas.height/numTilesY;const scaledTileWidth=tileWidth*scaleFactor;const scaledTileHeight=tileHeight*scaleFactor;for(let y=0;y<numTilesY;y++){for(let x=0;x<numTilesX;x++){const tileX=x*tileWidth;const tileY=y*tileHeight;const offsetX=(tileWidth-scaledTileWidth)/2;const offsetY=(tileHeight-scaledTileHeight)/2;outputCtx.drawImage(preTileCanvas,tileX+offsetX,tileY+offsetY,scaledTileWidth,scaledTileHeight);}} }
+          else if (selectedShape === 'brick_wall') { const tileWidth=outputCanvas.width/numTilesX;const tileHeight=outputCanvas.height/numTilesY;const scaledTileWidth=tileWidth*scaleFactor;const scaledTileHeight=tileHeight*scaleFactor;const startY=-1;const endY=numTilesY+1;const startX=-2;const endX=numTilesX+2;for(let y=startY;y<endY;y++){let xOffset=(y%2!==0)?tileWidth/2:0;for(let x=startX;x<endX;x++){const tileX=(x*tileWidth)-xOffset;const tileY=y*tileHeight;const drawOffsetX=(tileWidth-scaledTileWidth)/2;const drawOffsetY=(tileHeight-scaledTileHeight)/2;outputCtx.drawImage(preTileCanvas,tileX+drawOffsetX,tileY+drawOffsetY,scaledTileWidth,scaledTileHeight);}} }
+          else if (selectedShape === 'herringbone') { const plankWidth=outputCanvas.width/numTilesX;const plankHeight=outputCanvas.height/numTilesY;const scaledPlankWidth=plankWidth*scaleFactor;const scaledPlankHeight=plankHeight*scaleFactor;const step=Math.min(scaledPlankWidth,scaledPlankHeight)/Math.sqrt(2);const numCols=Math.ceil(outputCanvas.width/step)+4;const numRows=Math.ceil(outputCanvas.height/step)+4;for(let r=-2;r<numRows;r++){for(let c=-2;c<numCols;c++){outputCtx.save();const centerX=c*step+step/2;const centerY=r*step+step/2;const angle=((r+c)%2===0)?Math.PI/4:-Math.PI/4;outputCtx.translate(centerX,centerY);outputCtx.rotate(angle);const drawX=-scaledPlankWidth/2;const drawY=-scaledPlankHeight/2;outputCtx.beginPath();outputCtx.rect(drawX,drawY,scaledPlankWidth,scaledPlankHeight);outputCtx.clip();outputCtx.rotate(-angle);outputCtx.translate(-centerX,-centerY);outputCtx.drawImage(preTileCanvas,centerX-drawSourceWidth/2,centerY-drawSourceHeight/2,drawSourceWidth,drawSourceHeight);outputCtx.restore();}} }
+          else if (selectedShape === 'skewed') { const finalTileWidth=outputCanvas.width/numTilesX;const finalTileHeight=outputCanvas.height/numTilesY;const startY=-2;const endY=numTilesY+2;const startX=-3;const endX=Math.ceil(outputCanvas.width/finalTileWidth)+3;for(let y=startY;y<endY;y++){let xOffset=(y%2!==0)?(finalTileWidth*staggerFactor):0;for(let x=startX;x<endX;x++){const destX=(x*finalTileWidth)-xOffset;const destY=y*finalTileHeight;const currentSkew=(Math.abs(x%2)===0)?skewMagnitude:-skewMagnitude;outputCtx.save();outputCtx.translate(destX,destY);outputCtx.transform(1,0,currentSkew,1,0,0);const scaledWidth=finalTileWidth*scaleFactor;const scaledHeight=finalTileHeight*scaleFactor;const drawOffsetX=(finalTileWidth-scaledWidth)/2;const drawOffsetY=(finalTileHeight-scaledHeight)/2;outputCtx.drawImage(preTileCanvas,drawOffsetX,drawOffsetY,scaledWidth,scaledHeight);outputCtx.restore();}} }
+          else if (selectedShape === 'hexagon') { const hexRadiusW=outputCanvas.width/(numTilesX*1.5+0.5);const hexRadiusH=outputCanvas.height/(numTilesY*Math.sqrt(3)+0.5*Math.sqrt(3));const hexRadius=Math.min(hexRadiusW,hexRadiusH);const scaledHexRadius=hexRadius*scaleFactor;const hexWidth=Math.sqrt(3)*hexRadius;const hexHeight=2*hexRadius;const vertDist=hexHeight*3/4;const numCols=Math.ceil(outputCanvas.width/hexWidth)+2;const numRows=Math.ceil(outputCanvas.height/vertDist)+2;for(let row=-1;row<numRows;row++){for(let col=-1;col<numCols;col++){const cx=col*hexWidth+((row%2)!==0?hexWidth/2:0);const cy=row*vertDist;outputCtx.save();drawHexagonPath(outputCtx,cx,cy,scaledHexRadius);outputCtx.clip();outputCtx.drawImage(preTileCanvas,cx-drawSourceWidth/2,cy-drawSourceHeight/2,drawSourceWidth,drawSourceHeight);outputCtx.restore();}} }
+          else if (selectedShape === 'semi_octagon_square') { const sW=outputCanvas.width/(numTilesX*(1+Math.sqrt(2)/2));const sH=outputCanvas.height/(numTilesY*(1+Math.sqrt(2)/2));const sideLength=Math.min(sW,sH);const octRadius=sideLength/(2*Math.sin(Math.PI/8));const squareSide=sideLength;const scaledOctRadius=octRadius*scaleFactor;const scaledSquareSide=squareSide*scaleFactor;const distBetweenCenters=scaledOctRadius*Math.cos(Math.PI/8)+scaledSquareSide/2;const numUnitsX=Math.ceil(outputCanvas.width/distBetweenCenters)+4;const numUnitsY=Math.ceil(outputCanvas.height/distBetweenCenters)+4;for(let r=-2;r<numUnitsY;r++){for(let c=-2;c<numUnitsX;c++){const centerX=c*distBetweenCenters;const centerY=r*distBetweenCenters;const isOctagon=(Math.abs(r%2)===Math.abs(c%2));outputCtx.save();if(isOctagon){drawOctagonPath(outputCtx,centerX,centerY,scaledOctRadius);}else{drawSquarePath(outputCtx,centerX,centerY,scaledSquareSide);} outputCtx.clip();outputCtx.drawImage(preTileCanvas,centerX-drawSourceWidth/2,centerY-drawSourceHeight/2,drawSourceWidth,drawSourceHeight);outputCtx.restore();}} }
+          else if (selectedShape === 'l_shape_square') { const unitSizeX=outputCanvas.width/(numTilesX*2);const unitSizeY=outputCanvas.height/(numTilesY*2);const unitSize=Math.min(unitSizeX,unitSizeY);const scaledUnitSize=unitSize*scaleFactor;const scaledSquareSide=scaledUnitSize;const cellWidth=2*unitSize;const cellHeight=2*unitSize;const numCols=Math.ceil(outputCanvas.width/cellWidth)+2;const numRows=Math.ceil(outputCanvas.height/cellHeight)+2;for(let r=-1;r<numRows;r++){for(let c=-1;c<numCols;c++){const cellX=c*cellWidth;const cellY=r*cellHeight;const drawCenterX=cellX+unitSize;const drawCenterY=cellY+unitSize;outputCtx.save();outputCtx.translate(cellX,cellY+2*scaledUnitSize);outputCtx.rotate(-Math.PI/2);drawLTrominoPath(outputCtx,0,0,scaledUnitSize);outputCtx.clip();outputCtx.rotate(Math.PI/2);outputCtx.translate(-cellX,-(cellY+2*scaledUnitSize));outputCtx.drawImage(preTileCanvas,drawCenterX-drawSourceWidth/2,drawCenterY-drawSourceHeight/2,drawSourceWidth,drawSourceHeight);outputCtx.restore();outputCtx.save();outputCtx.translate(cellX+scaledUnitSize,cellY);drawLTrominoPath(outputCtx,0,0,scaledUnitSize);outputCtx.clip();outputCtx.translate(-(cellX+scaledUnitSize),-cellY);outputCtx.drawImage(preTileCanvas,drawCenterX-drawSourceWidth/2,drawCenterY-drawSourceHeight/2,drawSourceWidth,drawSourceHeight);outputCtx.restore();outputCtx.save();outputCtx.translate(cellX+scaledUnitSize,cellY+2*scaledUnitSize);outputCtx.rotate(Math.PI);drawLTrominoPath(outputCtx,0,0,scaledUnitSize);outputCtx.clip();outputCtx.rotate(-Math.PI);outputCtx.translate(-(cellX+scaledUnitSize),-(cellY+2*scaledUnitSize));outputCtx.drawImage(preTileCanvas,drawCenterX-drawSourceWidth/2,drawCenterY-drawSourceHeight/2,drawSourceWidth,drawSourceHeight);outputCtx.restore();outputCtx.save();outputCtx.translate(cellX+2*scaledUnitSize,cellY+scaledUnitSize);outputCtx.rotate(Math.PI/2);drawLTrominoPath(outputCtx,0,0,scaledUnitSize);outputCtx.clip();outputCtx.rotate(-Math.PI/2);outputCtx.translate(-(cellX+2*scaledUnitSize),-(cellY+scaledUnitSize));outputCtx.drawImage(preTileCanvas,drawCenterX-drawSourceWidth/2,drawCenterY-drawSourceHeight/2,drawSourceWidth,drawSourceHeight);outputCtx.restore();outputCtx.save();const sqCenterX=cellX+unitSize;const sqCenterY=cellY+unitSize;drawSquarePath(outputCtx,sqCenterX,sqCenterY,scaledSquareSide);outputCtx.clip();outputCtx.drawImage(preTileCanvas,sqCenterX-drawSourceWidth/2,sqCenterY-drawSourceHeight/2,drawSourceWidth,drawSourceHeight);outputCtx.restore();}} }
+          else if (selectedShape === 'hexagon_triangle') { const hexRadiusW=outputCanvas.width/(numTilesX*1.5+0.5);const hexRadiusH=outputCanvas.height/(numTilesY*Math.sqrt(3)+0.5*Math.sqrt(3));const hexRadius=Math.min(hexRadiusW,hexRadiusH);const sideLength=hexRadius;const scaledHexRadius=hexRadius*scaleFactor;const scaledSideLength=sideLength*scaleFactor;const hexWidth=Math.sqrt(3)*hexRadius;const hexHeight=2*hexRadius;const vertDist=hexHeight*3/4;const numCols=Math.ceil(outputCanvas.width/hexWidth)+2;const numRows=Math.ceil(outputCanvas.height/vertDist)+2;const triVertDist=scaledHexRadius*Math.sqrt(3)/2+scaledSideLength*Math.sqrt(3)/6;for(let row=-1;row<numRows;row++){for(let col=-1;col<numCols;col++){const cx=col*hexWidth+((row%2)!==0?hexWidth/2:0);const cy=row*vertDist;outputCtx.save();drawHexagonPath(outputCtx,cx,cy,scaledHexRadius);outputCtx.clip();outputCtx.drawImage(preTileCanvas,cx-drawSourceWidth/2,cy-drawSourceHeight/2,drawSourceWidth,drawSourceHeight);outputCtx.restore();for(let i=0;i<6;i++){const angle=Math.PI/3*i;const triCenterX=cx+triVertDist*Math.cos(angle);const triCenterY=cy+triVertDist*Math.sin(angle);const pointUp=(i%2===0);outputCtx.save();drawTrianglePath(outputCtx,triCenterX,triCenterY,scaledSideLength,pointUp);outputCtx.clip();outputCtx.drawImage(preTileCanvas,triCenterX-drawSourceWidth/2,triCenterY-drawSourceHeight/2,drawSourceWidth,drawSourceHeight);outputCtx.restore();}}} }
 
-          // <<< MODIFIED square_triangle block - SIZING LOGIC >>>
+          // <<< ORIGINAL square_triangle block - BEFORE sizing/logic fixes >>>
           else if (selectedShape === 'square_triangle') {
-              const SQRT3_OVER_2 = Math.sqrt(3) / 2; // ~0.866
+              // This logic might have issues with alignment and filling space
+             const triHeightRel=Math.sqrt(3)/2;
+             // Original attempt at sizing - might be incorrect
+             const avgRowHeight=(1+triHeightRel)/2;
+             const sideLengthX=outputCanvas.width/numTilesX;
+             const sideLengthY=outputCanvas.height/(numTilesY*avgRowHeight);
+             const sideLength=Math.min(sideLengthX,sideLengthY);
 
-              // Calculate the *scaled* side length needed to fit numTilesY pairs vertically
-              // Height of one pair = square height + triangle height = s + s * SQRT3_OVER_2 = s * (1 + SQRT3_OVER_2)
-              const totalVerticalUnits = numTilesY > 0 ? numTilesY : 1; // Avoid division by zero
-              const scaledSideLength = (outputCanvas.height / totalVerticalUnits) / (1 + SQRT3_OVER_2);
+             const squareSide=sideLength;
+             const triangleSide=sideLength;
+             const scaledSquareSide=squareSide*scaleFactor;
+             const scaledTriangleSide=triangleSide*scaleFactor;
+             const actualTriHeight=scaledTriangleSide*Math.sqrt(3)/2;
+             const actualSquareHeight=scaledSquareSide;
 
-              // Calculate the actual side length before scaling (used for layout)
-              const sideLength = scaledSideLength / scaleFactor;
+             // Original loop bounds
+             const numCols=Math.ceil(outputCanvas.width/sideLength)+4;
+             let currentY=-Math.max(actualSquareHeight,actualTriHeight)*1.5;
+             let rowCount=0;
 
-              // Actual heights based on the calculated scaled side length
-              const actualSquareHeight = scaledSideLength;
-              const actualTriHeight = scaledSideLength * SQRT3_OVER_2;
-
-              // Loop bounds (keep generous buffers from previous attempt)
-              const numCols = Math.ceil(outputCanvas.width / sideLength) + 6;
-              let currentY = -Math.max(actualSquareHeight, actualTriHeight) * 2.0;
-              let rowCount = 0;
-
-              while (currentY < outputCanvas.height + Math.max(actualSquareHeight, actualTriHeight) * 3) {
-                  const isSquareRow = (rowCount % 2 === 0);
-                  const currentRowHeight = isSquareRow ? actualSquareHeight : actualTriHeight;
-                  const isStaggered = (rowCount % 2 !== 0);
-
-                  for (let c = -3; c < numCols; c++) {
-                      const cellBaseX = c * sideLength + (isStaggered ? sideLength / 2 : 0);
-
-                      if (isSquareRow) {
-                          const sqCenterX = cellBaseX + sideLength / 2;
-                          // Center vertically within the allocated square row height
-                          const sqCenterY = currentY + actualSquareHeight / 2;
-                          outputCtx.save();
-                          // Use scaledSideLength for drawing the actual shape
-                          drawSquarePath(outputCtx, sqCenterX, sqCenterY, scaledSideLength);
-                          outputCtx.clip();
-                          outputCtx.drawImage(preTileCanvas, sqCenterX - drawSourceWidth / 2, sqCenterY - drawSourceHeight / 2, drawSourceWidth, drawSourceHeight);
-                          outputCtx.restore();
-                      } else { // Triangle row
-                          // Center vertically within the allocated triangle row height
-                          const triCenterY = currentY + actualTriHeight / 2;
-
-                          // Centers for the two triangles within the 'sideLength' wide cell
-                          const tri1CenterX = cellBaseX + sideLength * 0.25;
-                          const tri2CenterX = cellBaseX + sideLength * 0.75;
-
-                          // Use scaledSideLength for drawing the actual shape
-                          const tri1PointsUp = true;
-                          const tri2PointsUp = false;
-
-                          // Draw left triangle
-                          outputCtx.save();
-                          drawTrianglePath(outputCtx, tri1CenterX, triCenterY, scaledSideLength, tri1PointsUp);
-                          outputCtx.clip();
-                          outputCtx.drawImage(preTileCanvas, tri1CenterX - drawSourceWidth / 2, triCenterY - drawSourceHeight / 2, drawSourceWidth, drawSourceHeight);
-                          outputCtx.restore();
-
-                          // Draw right triangle
-                          outputCtx.save();
-                          drawTrianglePath(outputCtx, tri2CenterX, triCenterY, scaledSideLength, tri2PointsUp);
-                          outputCtx.clip();
-                          outputCtx.drawImage(preTileCanvas, tri2CenterX - drawSourceWidth / 2, triCenterY - drawSourceHeight / 2, drawSourceWidth, drawSourceHeight);
-                          outputCtx.restore();
-                      }
-                  }
-                  currentY += currentRowHeight; // Advance Y by the height of the row just drawn
-                  rowCount++;
-              }
+             while(currentY<outputCanvas.height+Math.max(actualSquareHeight,actualTriHeight)*2){
+                const isSquareRow=(rowCount%2===0);
+                const currentRowHeight=isSquareRow?actualSquareHeight:actualTriHeight;
+                for(let c=-2;c<numCols;c++){
+                    const cellBaseX=c*sideLength+(rowCount%2!==0?sideLength/2:0); // Original stagger calc
+                    if(isSquareRow){
+                        const sqCenterX=cellBaseX+sideLength/2;
+                        const sqCenterY=currentY+actualSquareHeight/2;
+                        outputCtx.save();
+                        drawSquarePath(outputCtx,sqCenterX,sqCenterY,scaledSquareSide);
+                        outputCtx.clip();
+                        outputCtx.drawImage(preTileCanvas,sqCenterX-drawSourceWidth/2,sqCenterY-drawSourceHeight/2,drawSourceWidth,drawSourceHeight);
+                        outputCtx.restore();
+                    } else {
+                        // Original logic: draws only ONE triangle per cell
+                        const triCenterY=currentY+actualTriHeight/2;
+                        const tri1CenterX=cellBaseX+sideLength/2;
+                        outputCtx.save();
+                        // Alternates point up/down based on column, not filling space
+                        drawTrianglePath(outputCtx,tri1CenterX,triCenterY,scaledTriangleSide,(c%2===0));
+                        outputCtx.clip();
+                        outputCtx.drawImage(preTileCanvas,tri1CenterX-drawSourceWidth/2,triCenterY-drawSourceHeight/2,drawSourceWidth,drawSourceHeight);
+                        outputCtx.restore();
+                    }
+                }
+                currentY+=currentRowHeight;
+                rowCount++;
+             }
           }
-          // <<< END MODIFIED block >>>
+          // <<< END ORIGINAL block >>>
 
-          else if (selectedShape === 'rhombus') { /* ... */ }
-          else if (selectedShape === 'basketweave') { /* ... */ }
+          else if (selectedShape === 'rhombus') { const rhombWidth=outputCanvas.width/numTilesX;const rhombHeight=outputCanvas.height/numTilesY;const scaledRhombWidth=rhombWidth*scaleFactor;const scaledRhombHeight=rhombHeight*scaleFactor;const startY=-1;const endY=numTilesY+2;const startX=-2;const endX=numTilesX+2;for(let y=startY;y<endY;y++){let xOffset=(y%2!==0)?rhombWidth/2:0;for(let x=startX;x<endX;x++){const centerX=x*rhombWidth+xOffset;const centerY=y*rhombHeight+rhombHeight/2;outputCtx.save();drawRhombusPath(outputCtx,centerX,centerY,scaledRhombWidth,scaledRhombHeight);outputCtx.clip();outputCtx.drawImage(preTileCanvas,centerX-drawSourceWidth/2,centerY-drawSourceHeight/2,drawSourceWidth,drawSourceHeight);outputCtx.restore();}} }
+          else if (selectedShape === 'basketweave') { const plankWidth=outputCanvas.width/numTilesX;const plankHeight=outputCanvas.height/numTilesY;const numCols=numTilesX+2;const numRows=numTilesY+2;for(let r=-1;r<numRows;r++){for(let c=-1;c<numCols;c++){const x=c*plankWidth;const y=r*plankHeight;const isHorizontal=((Math.floor(r/2)+Math.floor(c/2))%2===0);outputCtx.save();outputCtx.beginPath();outputCtx.rect(x,y,plankWidth,plankHeight);outputCtx.clip();if(!isHorizontal){outputCtx.translate(x+plankWidth/2,y+plankHeight/2);outputCtx.rotate(Math.PI/2);outputCtx.translate(-(x+plankWidth/2),-(y+plankHeight/2));outputCtx.drawImage(preTileCanvas,x+plankWidth/2-drawSourceHeight/2,y+plankHeight/2-drawSourceWidth/2,drawSourceHeight,drawSourceWidth);}else{outputCtx.drawImage(preTileCanvas,x+plankWidth/2-drawSourceWidth/2,y+plankHeight/2-drawSourceHeight/2,drawSourceWidth,drawSourceHeight);} outputCtx.restore();}} }
          // --- End Shape Logic ---
      } catch (e) {
           console.error(` [tiling/core.js] Error applying tiling shape "${selectedShape}":`, e);
