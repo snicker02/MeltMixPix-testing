@@ -110,7 +110,7 @@
               let yStartMultiplier = 1.5; // How many tile heights above the top edge to start drawing (e.g., 1.5)
               let yEndMultiplier = 2.0;   // How many tile heights below the bottom edge to stop drawing (e.g., 2.0)
               let startCol = -2;          // How many columns left of the first visible column to start drawing
-              let colBuffer = 4;          // How many extra columns to draw to the right
+              let colBuffer = 2;          // How many extra columns to draw to the right
               let staggerRatio = 0.5;     // How much to stagger odd rows (0.5 = half a tile width)
               let centerOffsetRatio = 0.5;// Ratio of sideLength for centering shapes (0.5 = middle)
               // --- End Adjustable Parameters ---
