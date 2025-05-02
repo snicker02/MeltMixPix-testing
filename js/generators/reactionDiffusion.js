@@ -149,8 +149,8 @@ export function generateReactionDiffusion(canvas, ctx, params) {
             // Map concentration of B (0 to 1) to grayscale (0 to 255)
             // You can experiment with different mappings here!
             // For example, map A to Red, B to Green? colorVal = A*255; data[pix+1]=B*255?
-            const bValue = gridB[index]; // Use the final state of gridB
-            const colorVal = Math.floor(bValue * 255);
+            const aValue = gridA[index]; // <<< CHANGE: Use gridA instead of gridB
+            const colorVal = Math.floor(aValue * 255); // <<< CHANGE: Use aValue for color
 
             data[pixelIndex]     = colorVal; // Red
             data[pixelIndex + 1] = colorVal; // Green
