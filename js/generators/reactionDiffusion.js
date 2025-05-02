@@ -21,13 +21,13 @@
  */
 export function generateReactionDiffusion(canvas, ctx, params) {
     const {
-        width = 256, // Keep default size reasonable for performance
+        width = 256,
         height = 256,
-        feed = 0.055, // Parameter F
-        kill = 0.062, // Parameter k
-        iterations = 50,
-        dA = 1.0,   // Diffusion rate A
-        dB = 0.5    // Diffusion rate B
+        feed = 0.055,
+        kill = 0.062,
+        iterations = 100, // Defaulting to more iterations
+        dA = 1.0,
+        dB = 0.5
     } = params;
 
     console.log(`Generating Reaction-Diffusion (${width}x${height}), F=${feed.toFixed(3)}, k=${kill.toFixed(3)}, iter=${iterations}`);
@@ -42,54 +42,64 @@ export function generateReactionDiffusion(canvas, ctx, params) {
     const imageData = ctx.createImageData(width, height);
     const data = imageData.data;
 
-    // Initialize grids using flat arrays for potential performance gain
+    // Initialize grids
     let gridA = new Float32Array(width * height);
     let gridB = new Float32Array(width * height);
     let nextGridA = new Float32Array(width * height);
     let nextGridB = new Float32Array(width * height);
 
     // --- Initialization ---
-    gridA.fill(1.0); // Fill grid A with 1
-    gridB.fill(0.0); // Fill grid B with 0
+    gridA.fill(1.0);
+    gridB.fill(0.0);
 
-    // Seed grid B (e.g., a small square in the center)
-    const seedSize = Math.max(1, Math.min(Math.floor(width/10), Math.floor(height/10))); // Seed size relative to canvas, min 1
+    // Seed grid B
+    const seedSize = Math.max(1, Math.min(Math.floor(width/10), Math.floor(height/10)));
     const startX = Math.floor(width / 2 - seedSize / 2);
     const startY = Math.floor(height / 2 - seedSize / 2);
-
     console.log(`Seeding B in region: [${startX},${startY}] to [${startX + seedSize},${startY + seedSize}]`);
     for (let y = startY; y < startY + seedSize; y++) {
         for (let x = startX; x < startX + seedSize; x++) {
-            // Ensure seeding stays within bounds
             if (x >= 0 && x < width && y >= 0 && y < height) {
-                const index = y * width + x;
-                gridB[index] = 1.0;
+                gridB[y * width + x] = 1.0; // Use direct index calculation
             }
         }
     }
 
-    // --- Laplacian Function (handles wrap-around boundaries) ---
-    // Weights for 3x3 kernel: Center=-1, Orthogonal=0.2, Diagonal=0.05
+    // --- Laplacian Function (REVISED - Careful Indexing) ---
+    // Weights: Center=-1, Orthogonal=0.2, Diagonal=0.05
     function laplacian(grid, x, y) {
         let sum = 0.0;
-        const idx_top = ((y - 1 + height) % height) * width;
-        const idx_mid = y * width;
-        const idx_bot = ((y + 1) % height) * width;
-        const idx_lft = (x - 1 + width) % width;
-        const idx_rgt = (x + 1) % width;
+        const w = width; // Shorter alias
+        const h = height;
 
-        // Orthogonal neighbors (weight 0.2)
-        sum += grid[idx_top + x]     * 0.2; // Top
-        sum += grid[idx_bot + x]     * 0.2; // Bottom
-        sum += grid[idx_mid + idx_lft] * 0.2; // Left
-        sum += grid[idx_mid + idx_rgt] * 0.2; // Right
-        // Diagonal neighbors (weight 0.05)
-        sum += grid[idx_top + idx_lft] * 0.05; // Top-Left
-        sum += grid[idx_top + idx_rgt] * 0.05; // Top-Right
-        sum += grid[idx_bot + idx_lft] * 0.05; // Bottom-Left
-        sum += grid[idx_bot + idx_rgt] * 0.05; // Bottom-Right
-        // Center (weight -1)
-        sum += grid[idx_mid + x] * -1.0;
+        // Calculate neighbor coordinates with wrap-around
+        const x_prev = (x - 1 + w) % w;
+        const x_next = (x + 1)     % w;
+        const y_prev = (y - 1 + h) % h;
+        const y_next = (y + 1)     % h;
+
+        // Calculate indices based on coordinates
+        const idx_curr = y * w + x;
+        const idx_n  = y_prev * w + x;      // North
+        const idx_s  = y_next * w + x;      // South
+        const idx_w  = y      * w + x_prev; // West
+        const idx_e  = y      * w + x_next; // East
+        const idx_nw = y_prev * w + x_prev; // Northwest
+        const idx_ne = y_prev * w + x_next; // Northeast
+        const idx_sw = y_next * w + x_prev; // Southwest
+        const idx_se = y_next * w + x_next; // Southeast
+
+        // Apply weights
+        sum += grid[idx_n]  * 0.2;
+        sum += grid[idx_s]  * 0.2;
+        sum += grid[idx_w]  * 0.2;
+        sum += grid[idx_e]  * 0.2;
+        sum += grid[idx_nw] * 0.05;
+        sum += grid[idx_ne] * 0.05;
+        sum += grid[idx_sw] * 0.05;
+        sum += grid[idx_se] * 0.05;
+        sum -= grid[idx_curr]; // Subtract center value (equivalent to weight -1)
+
         return sum;
     }
 
@@ -106,75 +116,48 @@ export function generateReactionDiffusion(canvas, ctx, params) {
                 const laplaceA = laplacian(gridA, x, y);
                 const laplaceB = laplacian(gridB, x, y);
 
-                const reaction = a * b * b; // The reaction term A*B^2
+                const reaction = a * b * b;
 
-                // Calculate change using Gray-Scott equations (dt=1 assumed for simplicity)
+                // Gray-Scott equations (dt=1)
                 const deltaA = (dA * laplaceA) - reaction + (feed * (1.0 - a));
                 const deltaB = (dB * laplaceB) + reaction - ((kill + feed) * b);
-            // <<< START DEBUG LOGGING (Add these lines) >>>
-            // Log values only occasionally and for a specific point (e.g., just outside the top-left of the seed)
-            const logX = startX - 1; // Point just left of the seed box
-            const logY = startY;     // Point on the same row as top of seed box
-            if (i === 10 && x === logX && y === logY) { // Log only on iteration 10 for this point
-                 console.log(`Iter <span class="math-inline">\{i\}, Pos \(</span>{x},${y}):`);
-                 console.log(`  a=<span class="math-inline">\{a\.toFixed\(3\)\}, b\=</span>{b.toFixed(3)}`); // Should be a=1, b=0 initially here
-                 console.log(`  laplaceB=${laplaceB.toFixed(3)}`);
-                 console.log(`  reaction=${reaction.toFixed(3)}`); // Should be 0 here initially
-                 console.log(`  killFeedTerm=${((kill + feed) * b).toFixed(3)}`); // Should be 0 here initially
-                 console.log(`  deltaB = (<span class="math-inline">\{\(dB \* laplaceB\)\.toFixed\(3\)\}\) \+ \(</span>{reaction.toFixed(3)}) - (${((kill + feed) * b).toFixed(3)}) = ${deltaB.toFixed(3)}`);
-            }
-            // <<< END DEBUG LOGGING >>>
-                // Calculate next state and clamp between 0 and 1
+
+                // Calculate next state and clamp
                 let nextA = a + deltaA;
                 let nextB = b + deltaB;
-                nextA = Math.max(0.0, Math.min(1.0, nextA));
-                nextB = Math.max(0.0, Math.min(1.0, nextB));
-
-                // Store in the 'next' grid
-                nextGridA[index] = nextA;
-                nextGridB[index] = nextB;
+                nextGridA[index] = Math.max(0.0, Math.min(1.0, nextA));
+                nextGridB[index] = Math.max(0.0, Math.min(1.0, nextB));
             }
         }
 
-        // Swap grids for the next iteration (efficiently swap references)
-        let tempA = gridA;
-        gridA = nextGridA;
-        nextGridA = tempA;
-
-        let tempB = gridB;
-        gridB = nextGridB;
-        nextGridB = tempB;
-
-        // Optional: Log progress every few iterations
-        // if ((i + 1) % 10 === 0) console.log(` RD Iteration: ${i + 1}/${iterations}`);
+        // Swap grids
+        let tempA = gridA; gridA = nextGridA; nextGridA = tempA;
+        let tempB = gridB; gridB = nextGridB; nextGridB = tempB;
     }
     let endSimTime = performance.now();
     console.log(`RD simulation finished in ${(endSimTime - startSimTime).toFixed(2)} ms.`);
 
-// --- Render final state (Visualizing Chemical B) ---
-console.log("Rendering final RD state (Visualizing Chemical B)...");
-for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-        const index = y * width + x;
-        const pixelIndex = index * 4;
-
-        // Map concentration of B (0 to 1) to grayscale (0 to 255)
-        const bValue = gridB[index]; // <<< CHANGE BACK to gridB
-        const colorVal = Math.floor(bValue * 255); // <<< CHANGE BACK to bValue
-
-        data[pixelIndex]     = colorVal; // Red
-        data[pixelIndex + 1] = colorVal; // Green
-        data[pixelIndex + 2] = colorVal; // Blue
-        data[pixelIndex + 3] = 255;      // Alpha
+    // --- Render final state (map chemical B to grayscale) ---
+    console.log("Rendering final RD state (Visualizing Chemical B)...");
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const index = y * width + x;
+            const pixelIndex = index * 4;
+            const bValue = gridB[index];
+            const colorVal = Math.floor(bValue * 255);
+            data[pixelIndex]     = colorVal; // R
+            data[pixelIndex + 1] = colorVal; // G
+            data[pixelIndex + 2] = colorVal; // B
+            data[pixelIndex + 3] = 255;      // A
+        }
     }
-}
-console.log("RD rendering calculation complete.");
+    console.log("RD rendering calculation complete.");
 
     // --- Draw to Canvas ---
     try {
         ctx.putImageData(imageData, 0, 0);
         console.log("Reaction-Diffusion pattern drawn to canvas.");
-        return imageData; // Return the generated data
+        return imageData;
     } catch (e) {
         console.error("Error putting generated RD image data on canvas:", e);
         return null;
