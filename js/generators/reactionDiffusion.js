@@ -111,7 +111,19 @@ export function generateReactionDiffusion(canvas, ctx, params) {
                 // Calculate change using Gray-Scott equations (dt=1 assumed for simplicity)
                 const deltaA = (dA * laplaceA) - reaction + (feed * (1.0 - a));
                 const deltaB = (dB * laplaceB) + reaction - ((kill + feed) * b);
-
+            // <<< START DEBUG LOGGING (Add these lines) >>>
+            // Log values only occasionally and for a specific point (e.g., just outside the top-left of the seed)
+            const logX = startX - 1; // Point just left of the seed box
+            const logY = startY;     // Point on the same row as top of seed box
+            if (i === 10 && x === logX && y === logY) { // Log only on iteration 10 for this point
+                 console.log(`Iter <span class="math-inline">\{i\}, Pos \(</span>{x},${y}):`);
+                 console.log(`  a=<span class="math-inline">\{a\.toFixed\(3\)\}, b\=</span>{b.toFixed(3)}`); // Should be a=1, b=0 initially here
+                 console.log(`  laplaceB=${laplaceB.toFixed(3)}`);
+                 console.log(`  reaction=${reaction.toFixed(3)}`); // Should be 0 here initially
+                 console.log(`  killFeedTerm=${((kill + feed) * b).toFixed(3)}`); // Should be 0 here initially
+                 console.log(`  deltaB = (<span class="math-inline">\{\(dB \* laplaceB\)\.toFixed\(3\)\}\) \+ \(</span>{reaction.toFixed(3)}) - (${((kill + feed) * b).toFixed(3)}) = ${deltaB.toFixed(3)}`);
+            }
+            // <<< END DEBUG LOGGING >>>
                 // Calculate next state and clamp between 0 and 1
                 let nextA = a + deltaA;
                 let nextB = b + deltaB;
@@ -139,26 +151,24 @@ export function generateReactionDiffusion(canvas, ctx, params) {
     let endSimTime = performance.now();
     console.log(`RD simulation finished in ${(endSimTime - startSimTime).toFixed(2)} ms.`);
 
-    // --- Render final state (map chemical B to grayscale) ---
-    console.log("Rendering final RD state...");
-    for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-            const index = y * width + x;
-            const pixelIndex = index * 4; // Index in the imageData array (R, G, B, A)
+// --- Render final state (Visualizing Chemical B) ---
+console.log("Rendering final RD state (Visualizing Chemical B)...");
+for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+        const index = y * width + x;
+        const pixelIndex = index * 4;
 
-            // Map concentration of B (0 to 1) to grayscale (0 to 255)
-            // You can experiment with different mappings here!
-            // For example, map A to Red, B to Green? colorVal = A*255; data[pix+1]=B*255?
-            const aValue = gridA[index]; // <<< CHANGE: Use gridA instead of gridB
-            const colorVal = Math.floor(aValue * 255); // <<< CHANGE: Use aValue for color
+        // Map concentration of B (0 to 1) to grayscale (0 to 255)
+        const bValue = gridB[index]; // <<< CHANGE BACK to gridB
+        const colorVal = Math.floor(bValue * 255); // <<< CHANGE BACK to bValue
 
-            data[pixelIndex]     = colorVal; // Red
-            data[pixelIndex + 1] = colorVal; // Green
-            data[pixelIndex + 2] = colorVal; // Blue
-            data[pixelIndex + 3] = 255;      // Alpha (fully opaque)
-        }
+        data[pixelIndex]     = colorVal; // Red
+        data[pixelIndex + 1] = colorVal; // Green
+        data[pixelIndex + 2] = colorVal; // Blue
+        data[pixelIndex + 3] = 255;      // Alpha
     }
-    console.log("RD rendering calculation complete.");
+}
+console.log("RD rendering calculation complete.");
 
     // --- Draw to Canvas ---
     try {
