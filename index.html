@@ -3,12 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Image Tiler & Effects</title>
+    <title>MeltMixPix: Image & Pattern Tool</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        /* Add this to ensure only one generator option set shows at a time */
+        .generator-options.hidden { display: none; }
+    </style>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
 
@@ -27,23 +31,26 @@
                      <div>
                          <label for="generatorType" class="block text-xs font-medium text-gray-600 mb-1">Algorithm:</label>
                          <select id="generatorType" name="generatorType" class="block w-full text-sm border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500" disabled>
-                             <option value="perlin" selected>Perlin Noise</option>
+                             <option value="perlin" selected>Simple Noise</option>
+                             <option value="reactionDiffusion">Reaction-Diffusion</option>
                              </select>
                      </div>
                       <div>
                           <label for="generatorWidth" class="block text-xs font-medium text-gray-600 mb-1">Width (px):</label>
-                          <input type="number" id="generatorWidth" value="512" min="64" max="2048" step="16" class="w-full" disabled>
+                          <input type="number" id="generatorWidth" value="512" min="64" max="1024" step="16" class="w-full" disabled>
                       </div>
                       <div>
                           <label for="generatorHeight" class="block text-xs font-medium text-gray-600 mb-1">Height (px):</label>
-                          <input type="number" id="generatorHeight" value="512" min="64" max="2048" step="16" class="w-full" disabled>
+                          <input type="number" id="generatorHeight" value="512" min="64" max="1024" step="16" class="w-full" disabled>
                       </div>
                  </div>
+
                  <div id="perlinOptions" class="generator-options grid grid-cols-1 md:grid-cols-4 gap-4 mb-3">
                      <div>
                          <label for="perlinScale" class="slider-label">Scale (<span id="perlinScaleValue">50</span>):</label>
                          <input type="range" id="perlinScale" name="perlinScale" min="5" max="200" value="50" step="1" class="w-full" disabled>
                      </div>
+                     <div></div>
                      <div>
                          <label for="perlinColor1" class="block text-xs font-medium text-gray-600 mb-1">Color 1:</label>
                          <input type="color" id="perlinColor1" name="perlinColor1" value="#000000" class="w-full h-8 p-0 border-0 cursor-pointer" disabled>
@@ -53,6 +60,22 @@
                           <input type="color" id="perlinColor2" name="perlinColor2" value="#ffffff" class="w-full h-8 p-0 border-0 cursor-pointer" disabled>
                       </div>
                  </div>
+
+                 <div id="reactionDiffusionOptions" class="generator-options hidden grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+                     <div>
+                         <label for="rdFeedSlider" class="slider-label">Feed Rate (F) (<span id="rdFeedValue">0.055</span>):</label>
+                         <input type="range" id="rdFeedSlider" name="rdFeedSlider" min="0.01" max="0.1" value="0.055" step="0.001" class="w-full" disabled>
+                     </div>
+                     <div>
+                          <label for="rdKillSlider" class="slider-label">Kill Rate (k) (<span id="rdKillValue">0.062</span>):</label>
+                         <input type="range" id="rdKillSlider" name="rdKillSlider" min="0.04" max="0.07" value="0.062" step="0.001" class="w-full" disabled>
+                     </div>
+                     <div>
+                          <label for="rdIterationsSlider" class="slider-label">Iterations (<span id="rdIterationsValue">50</span>):</label>
+                         <input type="range" id="rdIterationsSlider" name="rdIterationsSlider" min="5" max="200" value="50" step="1" class="w-full" disabled>
+                         <p class="text-xs text-gray-400 mt-1">Higher = Slower</p>
+                     </div>
+                     </div>
                  <div class="text-center">
                       <button id="generatePatternButton" class="bg-blue-500 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded text-sm disabled:opacity-50" disabled>
                           Generate & Use Pattern
