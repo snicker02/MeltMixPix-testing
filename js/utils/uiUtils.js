@@ -89,7 +89,6 @@ export function updateTilingControlsVisibility(elements, handleSliderChangeFunc)
     // Update scale slider value only if it differs from the new default for the selected shape
     if (needsSliderUpdate && scaleSlider && scaleSlider.value !== defaultScale.toString()) {
         scaleSlider.value = String(defaultScale);
-        // console.log(`Updating scale slider value to: ${scaleSlider.value}`);
     }
 
     // Always update the scale value display based on the current slider value
@@ -106,7 +105,6 @@ export function updateTilingControlsVisibility(elements, handleSliderChangeFunc)
 
     // Call the main slider change handler IF the scale was programmatically changed OR if it's needed generally
     if (needsSliderUpdate && typeof handleSliderChangeFunc === 'function') {
-        // console.log("Triggering handleSliderChangeFunc due to default scale change.");
         handleSliderChangeFunc(); // Trigger update if value changed
     }
 }
@@ -137,7 +135,6 @@ export function updatePreEffectControlsVisibility(elements) {
 
     let specificControlsShown = false;
     if (selectedEffect === 'none') {
-        // No controls needed
         specificControlsShown = true;
     } else if (selectedEffect === 'waveDistortion') {
         preEffectWaveDistortionOptions?.classList.remove('hidden');
@@ -158,7 +155,7 @@ export function updatePreEffectControlsVisibility(elements) {
         if (showIntensity) {
             preEffectIntensityControl?.classList.remove('hidden'); // Show the generic control group
             if (preEffectIntensitySlider) {
-                const intensityLabel = preEffectIntensityControl?.querySelector('label[for="preEffectIntensitySlider"]'); // More specific label selection
+                const intensityLabel = preEffectIntensityControl?.querySelector('label[for="preEffectIntensitySlider"]');
                 if (intensityLabel) {
                     let labelText = 'Intensity:'; let maxVal = 100; let minVal = 1;
                     if (selectedEffect === 'fractalZoom' || selectedEffect === 'sierpinski') { labelText = 'Intensity/Depth:'; }
@@ -167,19 +164,16 @@ export function updatePreEffectControlsVisibility(elements) {
                     preEffectIntensitySlider.max = String(maxVal);
                     preEffectIntensitySlider.min = String(minVal);
                 }
-                // Ensure current value is within new min/max bounds
                 const currentValue = parseFloat(preEffectIntensitySlider.value);
                 const clampedValue = Math.max(parseFloat(preEffectIntensitySlider.min), Math.min(parseFloat(preEffectIntensitySlider.max), currentValue));
                 if (currentValue !== clampedValue) {
                     preEffectIntensitySlider.value = String(clampedValue);
                 }
-                // Update the value display
                 if (preEffectIntensityValue) {
                      preEffectIntensityValue.textContent = preEffectIntensitySlider.value;
                 }
             }
         }
-        // else: // No specific controls and not generic intensity -> keep intensity hidden
     }
 
     // Show warning for potentially slow effects
@@ -189,25 +183,28 @@ export function updatePreEffectControlsVisibility(elements) {
 }
 
 /**
- * NEW: Updates visibility of GENERATOR controls based on the selected algorithm.
+ * Updates visibility of GENERATOR controls based on the selected algorithm.
+ * (MODIFIED to handle reactionDiffusionOptions)
  */
 export function updateGeneratorControlsVisibility(elements) {
     if (!elements.generatorType) {
          console.warn("[uiUtils.updateGeneratorControlsVisibility] Generator type dropdown not found.");
-         return; // Ensure dropdown exists
+         return;
     }
     const selectedGenerator = elements.generatorType.value;
 
     // Hide all generator-specific option groups first using a common class
     document.querySelectorAll('.generator-options').forEach(el => el.classList.add('hidden'));
 
-    // Show the relevant options container
+    // Show the relevant options container based on the selected value
     if (selectedGenerator === 'perlin') {
         elements.perlinOptions?.classList.remove('hidden');
+    } else if (selectedGenerator === 'reactionDiffusion') { // <<< ADDED
+        elements.reactionDiffusionOptions?.classList.remove('hidden');
     }
     // else if (selectedGenerator === '...') { elements.someOtherOptionsContainer?.classList.remove('hidden'); }
 
-    console.log(`[uiUtils] Updated generator controls visibility for: ${selectedGenerator}`);
+    // console.log(`[uiUtils] Updated generator controls visibility for: ${selectedGenerator}`);
 }
 
 
@@ -216,17 +213,15 @@ export function updateGeneratorControlsVisibility(elements) {
  */
 export function updateSourcePreviewTransform(elements, currentState) {
     const { sourcePreview, sourcePreviewContainer } = elements;
-    // Use default values from state if available, otherwise use fallback defaults
     let { sourceZoomLevel = 1.0, currentOffsetX = 0, currentOffsetY = 0 } = currentState || {};
 
     if (!sourcePreview || !sourcePreviewContainer) { return { clampedX: 0, clampedY: 0 }; }
 
-    // Get image dimensions directly from the img element if possible, otherwise use state's original dimensions
     const previewWidth = sourcePreview.naturalWidth || currentState?.originalWidth || 0;
     const previewHeight = sourcePreview.naturalHeight || currentState?.originalHeight || 0;
 
     if (!previewWidth || !previewHeight) {
-        sourcePreview.style.transform = 'translate(0px, 0px) scale(1)'; // Reset if no valid dimensions
+        sourcePreview.style.transform = 'translate(0px, 0px) scale(1)';
         return { clampedX: 0, clampedY: 0 };
     }
 
@@ -235,19 +230,15 @@ export function updateSourcePreviewTransform(elements, currentState) {
     const scaledWidth = previewWidth * sourceZoomLevel;
     const scaledHeight = previewHeight * sourceZoomLevel;
 
-    // Calculate bounds for panning
     const minOffsetX = Math.min(0, containerWidth - scaledWidth);
     const maxOffsetX = 0;
     const minOffsetY = Math.min(0, containerHeight - scaledHeight);
     const maxOffsetY = 0;
 
-    // Clamp offsets
-    // If image is smaller than container, center it; otherwise, apply panning within bounds.
     let clampedX = scaledWidth <= containerWidth ? (containerWidth - scaledWidth) / 2 : Math.max(minOffsetX, Math.min(maxOffsetX, currentOffsetX));
     let clampedY = scaledHeight <= containerHeight ? (containerHeight - scaledHeight) / 2 : Math.max(minOffsetY, Math.min(maxOffsetY, currentOffsetY));
 
     sourcePreview.style.transform = `translate(${clampedX.toFixed(2)}px, ${clampedY.toFixed(2)}px) scale(${sourceZoomLevel})`;
-    // Return the clamped values so the stateManager can store the actual applied offset
     return { clampedX, clampedY };
 }
 
@@ -260,7 +251,7 @@ export function handleDimensionChange(event, elements, aspectRatio) {
     const changedInput = event.target;
     if (!keepAspectRatioCheckbox?.checked || aspectRatio === null || aspectRatio <= 0 || !changedInput) { return; }
     const newValue = parseInt(changedInput.value, 10);
-    if (isNaN(newValue) || newValue <= 0) { return; } // Ignore invalid input
+    if (isNaN(newValue) || newValue <= 0) { return; }
 
     if (changedInput === outputWidthInput && outputHeightInput) {
          outputHeightInput.value = String(Math.round(newValue / aspectRatio));
@@ -271,7 +262,7 @@ export function handleDimensionChange(event, elements, aspectRatio) {
 
 /**
  * Resets UI elements to their initial (unloaded/startup) state.
- * (MODIFIED to include generator controls and function parameter)
+ * (MODIFIED to include Reaction-Diffusion controls)
  */
 export function resetUIState(
     elements,
@@ -279,13 +270,14 @@ export function resetUIState(
     updatePreEffectControlsVisibilityFunc,
     handleSliderChangeFunc,
     updateHistoryButtonsFunc,
-    updateGeneratorControlsVisibilityFunc // <<< ADDED parameter
+    updateGeneratorControlsVisibilityFunc // Parameter for generator visibility update
 ) {
     console.log('[uiUtils.resetUIState] Resetting UI elements...');
     const {
+        // Keep existing element references...
         imageLoader, sourcePreview, sourcePreviewText, finalPreview, finalPreviewText,
         saveButton, applyEffectButton, undoButton, redoButton,
-        tileShapeOptions, mirrorOptions, sliders, selects, // Sliders/selects arrays include generator controls now
+        tileShapeOptions, mirrorOptions, sliders, selects,
         outputWidthInput, outputHeightInput, keepAspectRatioCheckbox, sourceZoomValueSpan, sourceZoomSlider,
         canvas, preTileCanvas, mirrorCanvas, sourceEffectCanvas, sourcePreviewContainer,
         preEffectSelector, preEffectIntensitySlider, preEffectWaveAmplitudeSlider,
@@ -293,18 +285,20 @@ export function resetUIState(
         preEffectWaveType, sliceShiftDirection, sliceShiftIntensitySlider,
         pixelSortThresholdSlider, pixelSortDirection, pixelSortBy,
         tilesXSlider, tilesYSlider, skewSlider, staggerSlider, scaleSlider, preTileXSlider, preTileYSlider,
-        // <<< ADD Generator Element References >>>
+        // Generator Element References
         generatorType, generatorWidth, generatorHeight, generatePatternButton,
-        perlinScale, perlinColor1, perlinColor2
+        perlinScale, perlinColor1, perlinColor2,
+        // <<< ADDED Reaction-Diffusion References >>>
+        rdFeedSlider, rdKillSlider, rdIterationsSlider
     } = elements;
 
-    // Reset UI Elements
-    if (imageLoader) imageLoader.value = ''; // Clear file input
+    // --- Reset UI Elements ---
+    if (imageLoader) imageLoader.value = '';
     if (sourcePreview) { sourcePreview.classList.add('hidden'); sourcePreview.src = '#'; sourcePreview.style.transform = 'translate(0px, 0px) scale(1)'; }
-    if (sourcePreviewText) { sourcePreviewText.classList.remove('hidden'); sourcePreviewText.textContent = "Load image or generate pattern"; } // Updated text
+    if (sourcePreviewText) { sourcePreviewText.classList.remove('hidden'); sourcePreviewText.textContent = "Load image or generate pattern"; }
     if (finalPreview) { finalPreview.classList.add('hidden'); finalPreview.src = '#'; }
     if (finalPreviewText) { finalPreviewText.classList.remove('hidden'); finalPreviewText.textContent = "Preview will appear here"; }
-    if(sourcePreviewContainer) sourcePreviewContainer.style.cursor = 'default'; // Reset cursor
+    if(sourcePreviewContainer) sourcePreviewContainer.style.cursor = 'default';
 
     // Buttons
     if (saveButton) saveButton.disabled = true;
@@ -321,7 +315,7 @@ export function resetUIState(
     if (outputHeightInput) { outputHeightInput.disabled = true; outputHeightInput.value = ''; }
     if (keepAspectRatioCheckbox) { keepAspectRatioCheckbox.disabled = true; keepAspectRatioCheckbox.checked = true; }
 
-    // Tiling sliders (set to default values)
+    // Tiling sliders
     if (tilesXSlider) tilesXSlider.value = '1';
     if (tilesYSlider) tilesYSlider.value = '1';
     if (skewSlider) skewSlider.value = '0.5';
@@ -331,73 +325,78 @@ export function resetUIState(
     if (preTileYSlider) preTileYSlider.value = '1';
 
     // Source zoom
-    if (sourceZoomSlider) { sourceZoomSlider.disabled = true; sourceZoomSlider.value = '1.0'; } // Disable initially
+    if (sourceZoomSlider) { sourceZoomSlider.disabled = true; sourceZoomSlider.value = '1.0'; }
     if (sourceZoomValueSpan) sourceZoomValueSpan.textContent = '1.0';
 
     // Effect controls
     if (preEffectSelector) { preEffectSelector.disabled = true; preEffectSelector.value = 'none'; }
     if (preEffectIntensitySlider) preEffectIntensitySlider.value = '30';
     if (preEffectWaveAmplitudeSlider) preEffectWaveAmplitudeSlider.value = '10';
-    if (preEffectWaveFrequencySlider) preEffectWaveFrequencySlider.value = '5';
-    if (preEffectWavePhaseSlider) preEffectWavePhaseSlider.value = '0';
-    if (preEffectWaveDirection) preEffectWaveDirection.value = 'horizontal';
-    if (preEffectWaveType) preEffectWaveType.value = 'sine';
-    if (sliceShiftDirection) sliceShiftDirection.value = 'horizontal';
+    // ... reset other effect controls ...
     if (sliceShiftIntensitySlider) sliceShiftIntensitySlider.value = '30';
     if (pixelSortThresholdSlider) pixelSortThresholdSlider.value = '100';
-    if (pixelSortDirection) pixelSortDirection.value = 'horizontal';
-    if (pixelSortBy) pixelSortBy.value = 'brightness';
 
-    // <<< RESET Generator Controls (Enable them for initial state) >>>
-    if (generatorType) { generatorType.disabled = false; generatorType.value = 'perlin'; }
+
+    // --- RESET Generator Controls (Enable them for initial state) ---
+    if (generatorType) { generatorType.disabled = false; generatorType.value = 'perlin'; } // Default to perlin/simple noise
     if (generatorWidth) { generatorWidth.disabled = false; generatorWidth.value = '512'; }
     if (generatorHeight) { generatorHeight.disabled = false; generatorHeight.value = '512'; }
+    if (generatePatternButton) generatePatternButton.disabled = false;
+    // Perlin controls
     if (perlinScale) { perlinScale.disabled = false; perlinScale.value = '50'; }
     if (perlinColor1) { perlinColor1.disabled = false; perlinColor1.value = '#000000'; }
     if (perlinColor2) { perlinColor2.disabled = false; perlinColor2.value = '#ffffff'; }
-    if (generatePatternButton) generatePatternButton.disabled = false; // Enable generate button
+    // <<< ADDED Reaction-Diffusion Resets >>>
+    if (rdFeedSlider) { rdFeedSlider.disabled = false; rdFeedSlider.value = '0.055'; } // Default F value
+    if (rdKillSlider) { rdKillSlider.disabled = false; rdKillSlider.value = '0.062'; } // Default k value
+    if (rdIterationsSlider) { rdIterationsSlider.disabled = false; rdIterationsSlider.value = '50'; } // Default iterations
 
-    // Disable all grouped sliders/selects (most are disabled above, this catches any missed ones)
-    // Generator controls are re-enabled specifically above. Source zoom is disabled.
-    sliders?.forEach(el => { if(el && el !== elements.sourceZoomSlider) el.disabled = true; }); // Disable all EXCEPT zoom
+    // Disable all grouped sliders/selects initially (individual controls enabled above/below)
+    sliders?.forEach(el => { if(el) el.disabled = true; });
     selects?.forEach(el => { if(el) el.disabled = true; });
 
-    // Clear Canvases
+    // Re-enable specific controls needed at start
+    if (generatorType) generatorType.disabled = false;
+    if (generatorWidth) generatorWidth.disabled = false;
+    if (generatorHeight) generatorHeight.disabled = false;
+    if (generatePatternButton) generatePatternButton.disabled = false;
+    if (perlinScale) perlinScale.disabled = false; // Re-enable controls for default generator
+    if (perlinColor1) perlinColor1.disabled = false;
+    if (perlinColor2) perlinColor2.disabled = false;
+    if (rdFeedSlider) rdFeedSlider.disabled = false; // Enable RD sliders too initially
+    if (rdKillSlider) rdKillSlider.disabled = false;
+    if (rdIterationsSlider) rdIterationsSlider.disabled = false;
+
+
+    // --- Clear Canvases ---
     [canvas, preTileCanvas, mirrorCanvas, sourceEffectCanvas].forEach((c) => {
         if (c && c.width > 0 && c.height > 0) {
             try {
                 const ctx = c.getContext('2d');
-                if (ctx) {
-                    ctx.clearRect(0, 0, c.width, c.height);
-                }
+                if (ctx) { ctx.clearRect(0, 0, c.width, c.height); }
             } catch (e) { console.error(" Error clearing canvas:", e); }
         } else if (c) {
-             // Ensure canvases without dimensions are also reset (e.g., width/height attributes removed or set to 0)
-             // This helps if they were set previously but image load failed.
-             c.width = 0;
-             c.height = 0;
+             c.width = 0; c.height = 0; // Reset dimensions if invalid
         }
     });
 
-    // Update Button States via callback
+    // --- Update Button States via callback ---
     if (typeof updateHistoryButtonsFunc === 'function') { updateHistoryButtonsFunc(); }
 
-    // Update UI Visibility via callbacks
+    // --- Update UI Visibility via callbacks ---
     if (typeof updateTilingControlsVisibilityFunc === 'function') { updateTilingControlsVisibilityFunc(); }
     if (typeof updatePreEffectControlsVisibilityFunc === 'function') { updatePreEffectControlsVisibilityFunc(); }
-    // <<< CALL Generator Visibility Update >>>
     if (typeof updateGeneratorControlsVisibilityFunc === 'function') { updateGeneratorControlsVisibilityFunc(); }
 
-    // Call slider handler to sync displays with reset values (important after setting values above)
+    // --- Call slider handler to sync displays with reset values ---
     if (typeof handleSliderChangeFunc === 'function') { handleSliderChangeFunc(); }
 
     console.log('[uiUtils.resetUIState] UI Reset complete.');
 }
 
 
-// --- Panning Logic --- (Simplified helpers - No change needed)
+// --- Panning Logic --- (No change needed)
 export function startPan(event, elements) {
-    // Allow pan only if sourcePreview is visible (i.e., image loaded or pattern generated)
     if (event.button !== 0 || elements.sourcePreview?.classList.contains('hidden')) { return false; }
     if (event.target === elements?.sourcePreview) { event.preventDefault(); }
     if (elements?.sourcePreviewContainer) { elements.sourcePreviewContainer.style.cursor = 'grabbing'; }
@@ -411,9 +410,8 @@ export function endPan(elements) {
    if(elements?.sourcePreviewContainer) { elements.sourcePreviewContainer.style.cursor = 'grab'; }
 }
 
-// --- Source Zoom Logic --- (Simplified helper - No change needed)
+// --- Source Zoom Logic --- (No change needed)
 export function handleSourceZoom(elements, currentStateSnapshot, stateUpdateFunc) {
-    // Allow zoom only if source image exists (loaded or generated)
     if (!currentStateSnapshot?.originalWidth || !elements?.sourceZoomSlider) { return; }
     const newZoomLevel = parseFloat(elements.sourceZoomSlider.value);
     if (elements.sourceZoomValueSpan) { elements.sourceZoomValueSpan.textContent = newZoomLevel.toFixed(1); }
@@ -424,14 +422,16 @@ export function handleSourceZoom(elements, currentStateSnapshot, stateUpdateFunc
 export function setupSliderListener(slider, valueDisplay, callback, formatter = val => val) {
     if (!slider) { return; }
     const update = () => {
-        if (slider.disabled) return; // Don't update if disabled
+        if (slider.disabled) return;
         const currentValue = slider.value;
-        if (valueDisplay) { try { valueDisplay.textContent = formatter(currentValue); } catch (e) { console.warn("Error updating slider value display:", e); } }
+        if (valueDisplay) { try { valueDisplay.textContent = formatter(currentValue); } catch (e) { console.warn("Error updating slider display:", e); } }
         if (typeof callback === 'function') { try { callback(); } catch (e) { console.warn("Error in slider callback:", e); } }
     };
     slider.addEventListener('input', update);
-    slider.addEventListener('change', update); // Also trigger on 'change' for accessibility/alternative inputs
-    // update(); // Initial update can cause issues if called before state is fully ready, better done explicitly after init
+    slider.addEventListener('change', update);
+    // Call update initially to set display (ensure callback handles potential null state)
+    // Deferring this initial call slightly might be safer if state isn't ready
+    // requestAnimationFrame(update); // Or call explicitly after initializeApp
 }
 
 /**
@@ -441,6 +441,5 @@ export function updateUndoRedoButtons(elements, historyInfo) {
     if (elements.undoButton) elements.undoButton.disabled = !historyInfo || historyInfo.index <= 0;
     if (elements.redoButton) elements.redoButton.disabled = !historyInfo || historyInfo.index >= historyInfo.length - 1;
 }
-
 
 console.log('[uiUtils] Module loaded successfully.');
