@@ -2,35 +2,21 @@
 
 /**
  * Generates a Reaction-Diffusion (Gray-Scott) pattern.
- * Based on the equations:
- * dA/dt = (dA * Laplacian(A)) - (A * B^2) + (feed * (1 - A))
- * dB/dt = (dB * Laplacian(B)) + (A * B^2) - ((kill + feed) * B)
- * Assumes dt = 1 for simplicity in updates.
- *
- * @param {HTMLCanvasElement} canvas - The target canvas.
- * @param {CanvasRenderingContext2D} ctx - The target canvas context.
- * @param {object} params - Parameters for generation.
- * @param {number} params.width - Desired width.
- * @param {number} params.height - Desired height.
- * @param {number} params.feed - Feed rate (F).
- * @param {number} params.kill - Kill rate (k).
- * @param {number} params.iterations - Number of simulation steps.
- * @param {number} [params.dA=1.0] - Diffusion rate for chemical A.
- * @param {number} [params.dB=0.5] - Diffusion rate for chemical B.
- * @returns {ImageData | null} The generated ImageData or null on error.
+ * REVISED: Includes explicit dt and simplified Laplacian weights.
  */
 export function generateReactionDiffusion(canvas, ctx, params) {
     const {
         width = 256,
         height = 256,
-        feed = 0.055,
-        kill = 0.062,
-        iterations = 100, // Defaulting to more iterations
-        dA = 1.0,
-        dB = 0.5
+        feed = 0.055, // Parameter F
+        kill = 0.062, // Parameter k
+        iterations = 100,
+        dA = 1.0,   // Diffusion rate A
+        dB = 0.5,   // Diffusion rate B
+        dt = 1.0    // Time step (often 1, but can be adjusted)
     } = params;
 
-    console.log(`Generating Reaction-Diffusion (${width}x${height}), F=${feed.toFixed(3)}, k=${kill.toFixed(3)}, iter=${iterations}`);
+    console.log(`Generating Reaction-Diffusion (${width}x${height}), F=${feed.toFixed(3)}, k=${kill.toFixed(3)}, iter=${iterations}, dt=${dt}`);
 
     if (!canvas || !ctx) {
         console.error("ReactionDiffusion Error: Canvas or Context not provided.");
@@ -60,45 +46,30 @@ export function generateReactionDiffusion(canvas, ctx, params) {
     for (let y = startY; y < startY + seedSize; y++) {
         for (let x = startX; x < startX + seedSize; x++) {
             if (x >= 0 && x < width && y >= 0 && y < height) {
-                gridB[y * width + x] = 1.0; // Use direct index calculation
+                gridB[y * width + x] = 1.0;
             }
         }
     }
 
-    // --- Laplacian Function (REVISED - Careful Indexing) ---
-    // Weights: Center=-1, Orthogonal=0.2, Diagonal=0.05
+    // --- Laplacian Function (Simplified Weights) ---
+    // Weights: Center=-1, Orthogonal=0.25, Diagonal=0
     function laplacian(grid, x, y) {
         let sum = 0.0;
-        const w = width; // Shorter alias
+        const w = width;
         const h = height;
 
-        // Calculate neighbor coordinates with wrap-around
-        const x_prev = (x - 1 + w) % w;
-        const x_next = (x + 1)     % w;
-        const y_prev = (y - 1 + h) % h;
-        const y_next = (y + 1)     % h;
-
-        // Calculate indices based on coordinates
         const idx_curr = y * w + x;
-        const idx_n  = y_prev * w + x;      // North
-        const idx_s  = y_next * w + x;      // South
-        const idx_w  = y      * w + x_prev; // West
-        const idx_e  = y      * w + x_next; // East
-        const idx_nw = y_prev * w + x_prev; // Northwest
-        const idx_ne = y_prev * w + x_next; // Northeast
-        const idx_sw = y_next * w + x_prev; // Southwest
-        const idx_se = y_next * w + x_next; // Southeast
+        const idx_n  = ((y - 1 + h) % h) * w + x;
+        const idx_s  = ((y + 1    ) % h) * w + x;
+        const idx_w  = y * w + ((x - 1 + w) % w);
+        const idx_e  = y * w + ((x + 1    ) % w);
 
-        // Apply weights
-        sum += grid[idx_n]  * 0.2;
-        sum += grid[idx_s]  * 0.2;
-        sum += grid[idx_w]  * 0.2;
-        sum += grid[idx_e]  * 0.2;
-        sum += grid[idx_nw] * 0.05;
-        sum += grid[idx_ne] * 0.05;
-        sum += grid[idx_sw] * 0.05;
-        sum += grid[idx_se] * 0.05;
-        sum -= grid[idx_curr]; // Subtract center value (equivalent to weight -1)
+        // Apply weights (simplified kernel)
+        sum += grid[idx_n] * 0.25;
+        sum += grid[idx_s] * 0.25;
+        sum += grid[idx_w] * 0.25;
+        sum += grid[idx_e] * 0.25;
+        sum -= grid[idx_curr]; // Subtract center value
 
         return sum;
     }
@@ -118,13 +89,14 @@ export function generateReactionDiffusion(canvas, ctx, params) {
 
                 const reaction = a * b * b;
 
-                // Gray-Scott equations (dt=1)
+                // Gray-Scott equations
                 const deltaA = (dA * laplaceA) - reaction + (feed * (1.0 - a));
                 const deltaB = (dB * laplaceB) + reaction - ((kill + feed) * b);
 
-                // Calculate next state and clamp
-                let nextA = a + deltaA;
-                let nextB = b + deltaB;
+                // Calculate next state using dt and clamp
+                // <<< Use dt in the update step >>>
+                let nextA = a + deltaA * dt;
+                let nextB = b + deltaB * dt;
                 nextGridA[index] = Math.max(0.0, Math.min(1.0, nextA));
                 nextGridB[index] = Math.max(0.0, Math.min(1.0, nextB));
             }
@@ -143,7 +115,7 @@ export function generateReactionDiffusion(canvas, ctx, params) {
         for (let x = 0; x < width; x++) {
             const index = y * width + x;
             const pixelIndex = index * 4;
-            const bValue = gridB[index];
+            const bValue = gridB[index]; // Render B
             const colorVal = Math.floor(bValue * 255);
             data[pixelIndex]     = colorVal; // R
             data[pixelIndex + 1] = colorVal; // G
